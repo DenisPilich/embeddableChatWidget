@@ -1,0 +1,23 @@
+{
+  "name": "@ecw/widget",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/ecw-widget.js",
+  "module": "./dist/ecw-widget.js",
+  "dependencies": {
+    "@ecw/shared": "workspace:*"
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2"
+  }
+}

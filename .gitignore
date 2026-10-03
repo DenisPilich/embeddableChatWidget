@@ -1,0 +1,31 @@
+# Зависимости
+node_modules/
+
+# Сборка
+dist/
+*.tsbuildinfo
+
+# Окружение и секреты
+.env
+.env.*
+!.env.example
+
+# Логи
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Покрытие тестами
+coverage/
+
+# Артефакты тестов
+/test-results/
+/playwright-report/
+
+# Редакторы и ОС
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json

@@ -1,0 +1,17 @@
+# Нормализация переводов строк.
+# На Windows без этого файла git может превратить LF в CRLF и получить диффы
+# там, где ничего не менялось.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.pdf binary
+*.zip binary

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Кофейня «Тучка» — стенд «чужой сайт»</title>
+
+    <!--
+      Это стенд, изображающий сайт клиента, а не наш собственный интерфейс.
+      Он намеренно сделан «чужим»:
+        * собственные стили прямо в документе, без сборщика;
+        * свои шрифт, цвета и размеры — чтобы сразу было видно, если стили
+          виджета протекут наружу, а стили страницы — внутрь виджета;
+        * никакого отношения к нашему стеку.
+      В Фазе 1 рядом появятся враждебные варианты этой страницы.
+    -->
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      body {
+        margin: 0;
+        /* Наследуемые свойства (шрифт, цвет, межстрочный интервал) проходят
+           сквозь границу Shadow DOM. Этот serif — приманка: если в Фазе 1
+           текст внутри виджета окажется с засечками, значит сброс на :host
+           сделан неправильно. */
+        font-family: Georgia, 'Times New Roman', serif;
+        line-height: 1.6;
+        color: #3b2f2a;
+        background: #f6f1e7;
+      }
+
+      .wrap {
+        max-width: 46rem;
+        margin: 0 auto;
+        padding: 3rem 1.5rem 6rem;
+      }
+
+      header {
+        border-bottom: 3px double #c8b8a1;
+        padding-bottom: 1rem;
+        margin-bottom: 2rem;
+      }
+
+      h1 {
+        margin: 0 0 0.25rem;
+        font-size: 2rem;
+        letter-spacing: 0.02em;
+      }
+
+      .tagline {
+        margin: 0;
+        font-style: italic;
+        color: #7a6a5c;
+      }
+
+      h2 {
+        font-size: 1.25rem;
+        margin-top: 2.5rem;
+      }
+
+      .hours {
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      .hours th,
+      .hours td {
+        text-align: left;
+        padding: 0.4rem 0.75rem 0.4rem 0;
+        border-bottom: 1px solid #ded2bf;
+      }
+
+      .hours th {
+        font-weight: normal;
+        color: #7a6a5c;
+      }
+
+      footer {
+        margin-top: 4rem;
+        font-size: 0.875rem;
+        color: #8a7a6c;
+        border-top: 1px solid #ded2bf;
+        padding-top: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Кофейня «Тучка»</h1>
+        <p class="tagline">Обжариваем по вторникам, печём каждый день</p>
+      </header>
+
+      <p>
+        Мы небольшая кофейня на углу Виноградной и Пекарского. Работаем с 2014 года,
+        обжариваем зерно сами и не подаём ничего, чего не стали бы пить сами.
+      </p>
+
+      <h2>Часы работы</h2>
+      <table class="hours">
+        <tbody>
+          <tr>
+            <th>Понедельник — пятница</th>
+            <td>08:00 — 21:00</td>
+          </tr>
+          <tr>
+            <th>Суббота</th>
+            <td>09:00 — 22:00</td>
+          </tr>
+          <tr>
+            <th>Воскресенье</th>
+            <td>09:00 — 19:00</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Как нас найти</h2>
+      <p>
+        Виноградная 14, вход со двора. Если увидели очередь на улице — она движется
+        быстрее, чем кажется.
+      </p>
+
+      <footer>
+        <p>© Кофейня «Тучка». Стенд для разработки виджета, содержимое вымышленное.</p>
+      </footer>
+    </div>
+
+    <!--
+      Здесь в Фазе 1 появится вставка виджета — ровно такая, какую получит клиент:
+
+        <script src="/ecw-widget.iife.js" data-site-id="demo" async></script>
+
+      Файл раздаётся из packages/widget/dist (см. publicDir в vite.config.ts).
+    -->
+  </body>
+</html>
