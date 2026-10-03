@@ -1,56 +1,104 @@
-import { CONTRACT_VERSION, type SiteId } from '@ecw/shared';
+import { readOptionsFromScript } from './config';
+import { whenReady } from './dom';
+import { log } from './logger';
+import { ChatWidget, HOST_ATTRIBUTE } from './widget';
+import type { InitOptions, WidgetInstance } from './types';
+
+export type { EcwGlobal, InitOptions, WidgetInstance } from './types';
 
 /**
- * Публичная точка входа виджета.
- *
- * ВНИМАНИЕ: это заглушка. Она не рисует интерфейс — её задача доказать, что
- * сборка библиотеки, связи между пакетами монорепо и загрузка скрипта на чужой
- * странице работают. Настоящий виджет (Shadow DOM, окно чата) — Фаза 1.
+ * Версия пакета. Подставляется сборщиком на этапе сборки (см. `define`
+ * в vite.config.ts) — так версия в коде и версия в package.json не разъезжаются.
  */
+declare const __ECW_VERSION__: string;
 
-export interface InitOptions {
-  siteId: SiteId;
+export const version = __ECW_VERSION__;
+
+/**
+ * Общее состояние виджета.
+ *
+ * Лежит на `window`, а не в переменной модуля: если скрипт подключён дважды,
+ * модуль выполнится дважды, и у каждой копии будет своя переменная, а страница
+ * у нас одна.
+ */
+function state(): { instance: WidgetInstance | null } {
+  const existing = window.__ECW_STATE__;
+  if (existing) return existing;
+
+  const created: { instance: WidgetInstance | null } = { instance: null };
+  window.__ECW_STATE__ = created;
+  return created;
 }
 
-export interface EcwGlobal {
-  init(options: InitOptions): void;
-  version: string;
-}
+/**
+ * Создаёт виджет на странице клиента.
+ *
+ * Повторные вызовы безопасны: второй виджет не появится.
+ */
+export function init(options: InitOptions): void {
+  // Пакет может быть импортирован и вне браузера: при сборке, в тестах, при
+  // серверном рендеринге. Там виджет обязан молча ничего не делать.
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
-declare global {
-  interface Window {
-    /** Публичный объект виджета на странице клиента. */
-    ECW?: EcwGlobal;
-    /**
-     * Включает отладочные сообщения. По умолчанию выключено: на чужой странице
-     * виджет не имеет права шуметь без явной просьбы.
-     */
-    ECW_DEBUG?: boolean;
+  const siteId = typeof options?.siteId === 'string' ? options.siteId.trim() : '';
+  if (!siteId) {
+    // Не бросаем исключение: наша ошибка не должна ломать чужую страницу.
+    console.warn('[ecw] виджет не запущен: не указан siteId');
+    return;
+  }
+
+  const current = state();
+  if (current.instance) {
+    log('виджет уже создан, повторная инициализация пропущена');
+    return;
+  }
+
+  // Вторая линия защиты. Состояние на window спасает от двойного подключения
+  // скрипта, а эта проверка — ещё и от случая, когда разметка осталась, а
+  // состояние почему-то потеряно.
+  if (document.querySelector(`[${HOST_ATTRIBUTE}]`)) {
+    console.warn('[ecw] на странице уже есть виджет');
+    return;
+  }
+
+  try {
+    current.instance = new ChatWidget({ siteId });
+    log(`виджет готов: siteId=${siteId}, версия ${version}`);
+  } catch (error) {
+    // Виджет — гость на чужой странице: выпускать исключение наружу нельзя,
+    // иначе оно всплывёт в чужом коде обработчиком ошибок.
+    console.error('[ecw] не удалось создать виджет', error);
   }
 }
 
-export function init(options: InitOptions): void {
-  // Виджет обязан быть безопасным гостем на чужой странице: любая наша ошибка
-  // не имеет права сломать сайт клиента. Отсюда проверки вместо предположений.
-  if (typeof document === 'undefined') return;
-
-  log(`заглушка инициализирована: siteId=${options.siteId}, контракт v${CONTRACT_VERSION}`);
+export function open(): void {
+  state().instance?.open();
 }
 
-/**
- * Единственное место в виджете, которому разрешено писать в консоль — и только
- * тогда, когда отладку включили явно. Правило no-console сознательно запрещает
- * делать это где-либо ещё, поэтому здесь стоит точечное исключение с причиной;
- * в Фазе 1 этот код переедет в отдельный модуль отладки.
- */
-function log(message: string): void {
-  if (typeof window === 'undefined' || !window.ECW_DEBUG) return;
-  // eslint-disable-next-line no-console -- см. пояснение к функции log
-  console.info(`[ecw] ${message}`);
+export function close(): void {
+  state().instance?.close();
 }
 
-// Самопроверка сборки: если этот объект виден на чужой странице, значит IIFE-сборка,
-// резолв workspace-зависимости и подключение скрипта работают.
+export function toggle(): void {
+  state().instance?.toggle();
+}
+
+export function isOpen(): boolean {
+  return state().instance?.isOpen() ?? false;
+}
+
 if (typeof window !== 'undefined') {
-  window.ECW = { init, version: `0.0.0+contract.${CONTRACT_VERSION}` };
+  // Публичный объект на странице клиента. Для сборки в формате IIFE этот же
+  // набор функций выставляет и сам сборщик (build.lib.name), а для тех, кто
+  // ставит пакет из npm, он нужен здесь.
+  window.ECW = { version, init, open, close, toggle, isOpen };
+
+  // Автозапуск: клиент вставил <script src="..." data-site-id="..." async>.
+  // Разметка при этом может быть ещё не разобрана — whenReady это учитывает.
+  const options = typeof document === 'undefined' ? null : readOptionsFromScript();
+  if (options) {
+    whenReady(() => init(options));
+  } else {
+    log('параметров в теге скрипта нет: ждём вызова window.ECW.init({ siteId })');
+  }
 }
