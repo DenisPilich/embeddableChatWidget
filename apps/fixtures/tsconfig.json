@@ -1,4 +1,12 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["vite.config.ts"]
+  "compilerOptions": {
+    // Тесты выполняются в браузере через Playwright, поэтому здесь нужен DOM:
+    // в базовом конфиге его нет намеренно, чтобы общий пакет не мог трогать
+    // document.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // Нужен для process.env в конфигурации Playwright.
+    "types": ["node"]
+  },
+  "include": ["e2e", "vite.config.ts", "playwright.config.ts"]
 }

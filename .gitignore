@@ -18,9 +18,11 @@ pnpm-debug.log*
 # Покрытие тестами
 coverage/
 
-# Артефакты тестов
-/test-results/
-/playwright-report/
+# Артефакты тестов Playwright. Без ведущего слэша: они появляются в том пакете,
+# где запускаются тесты, а не только в корне репозитория.
+test-results/
+playwright-report/
+blob-report/
 
 # Редакторы и ОС
 .DS_Store
