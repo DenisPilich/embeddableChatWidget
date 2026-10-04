@@ -1,0 +1,14 @@
+[
+  {
+    "name": "виджет на странице клиента (IIFE, gzip)",
+    "path": "packages/widget/dist/ecw-widget.iife.js",
+    "limit": "15 kB",
+    "gzip": true
+  },
+  {
+    "name": "виджет для сборщиков (ESM, gzip)",
+    "path": "packages/widget/dist/ecw-widget.js",
+    "limit": "15 kB",
+    "gzip": true
+  }
+]
