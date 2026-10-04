@@ -166,6 +166,12 @@ export const styles = `
       visibility 0s;
   }
 
+  /* Окно получает фокус программно при открытии. Это цель фокуса, а не элемент
+     управления, поэтому рамку вокруг него не рисуем. */
+  .ecw-panel:focus {
+    outline: none;
+  }
+
   .ecw-header {
     display: flex;
     align-items: center;
@@ -224,6 +230,15 @@ export const styles = `
     overflow-y: auto;
     padding: 16px;
     overscroll-behavior: contain;
+  }
+
+  /* Область переписки прокручивается, а прокручиваемая область обязана быть
+     доступной с клавиатуры: без tabindex её нельзя прокрутить стрелками, и
+     длинная переписка остаётся недостижимой. Рамка рисуется внутрь, иначе её
+     срежет overflow окна. */
+  .ecw-body:focus-visible {
+    outline: 2px solid var(--ecw-primary);
+    outline-offset: -2px;
   }
 
   .ecw-log {

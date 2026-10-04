@@ -31,7 +31,14 @@ const INPUT_MAX_HEIGHT = 120;
  * страницы: дерево своё.)
  */
 const MARKUP = `
-  <div class="ecw-panel" role="dialog" aria-label="Чат" aria-hidden="true">
+  <div
+    class="ecw-panel"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Чат"
+    aria-hidden="true"
+    tabindex="-1"
+  >
     <header class="ecw-header">
       <div class="ecw-header__text">
         <p class="ecw-header__title">Чат</p>
@@ -55,14 +62,15 @@ const MARKUP = `
       </button>
     </header>
 
-    <div class="ecw-body">
-      <div
-        class="ecw-log"
-        role="log"
-        aria-label="Переписка"
-        aria-live="polite"
-        aria-relevant="additions"
-      >
+    <div
+      class="ecw-body"
+      role="log"
+      aria-label="Переписка"
+      aria-live="polite"
+      aria-relevant="additions"
+      tabindex="0"
+    >
+      <div class="ecw-log">
         <div class="ecw-message ecw-message--typing" hidden>
           <span class="ecw-visually-hidden">Ассистент печатает</span>
           <div class="ecw-message__bubble" aria-hidden="true">
@@ -137,6 +145,7 @@ export class ChatWidget implements WidgetInstance {
   private readonly input: HTMLTextAreaElement;
   private readonly sendButton: HTMLButtonElement;
   private readonly composer: HTMLFormElement;
+  private readonly shadow: ShadowRoot;
   private readonly messages: MessagesView;
   private readonly onDocumentKeyDown: (event: KeyboardEvent) => void;
   private opened = false;
@@ -151,7 +160,8 @@ export class ChatWidget implements WidgetInstance {
     // Режим 'open', а не 'closed': closed не даёт настоящей защиты (стили и
     // разметку всё равно видно в devtools), но лишает возможности отлаживать
     // и тестировать виджет снаружи.
-    const shadow = this.host.attachShadow({ mode: 'open' });
+    this.shadow = this.host.attachShadow({ mode: 'open' });
+    const shadow = this.shadow;
     applyStyles(shadow);
 
     const container = document.createElement('div');
@@ -184,11 +194,10 @@ export class ChatWidget implements WidgetInstance {
     });
     this.input.addEventListener('keydown', (event) => this.handleInputKeyDown(event));
 
-    // Esc закрывает окно, даже если фокус находится на странице клиента,
-    // а не внутри виджета.
-    this.onDocumentKeyDown = (event) => {
-      if (event.key === 'Escape' && this.opened) this.close();
-    };
+    // Обработчик висит на документе, а не на shadow root: события клавиатуры
+    // всплывают из теневого дерева наружу, поэтому так мы поймаем их, даже если
+    // фокус оказался на странице клиента.
+    this.onDocumentKeyDown = (event) => this.handleDocumentKeyDown(event);
     document.addEventListener('keydown', this.onDocumentKeyDown);
 
     const mount = pickMountNode();
@@ -206,12 +215,17 @@ export class ChatWidget implements WidgetInstance {
     if (this.opened) return;
     this.opened = true;
     this.host.setAttribute(OPEN_ATTRIBUTE, '');
-    this.panel.setAttribute('aria-hidden', 'false');
+    this.panel.removeAttribute('aria-hidden');
     this.launcher.setAttribute('aria-expanded', 'true');
     this.launcher.setAttribute('aria-label', 'Закрыть чат');
     // Пока окно было скрыто, в нём могли появиться сообщения — показываем
     // последнее из них.
     this.messages.scrollToLatest();
+    // Фокус переносим внутрь окна: иначе он остался бы на кнопке запуска, а
+    // программа чтения с экрана не узнала бы, что открылся диалог. Ставим его
+    // на само окно, а не на поле ввода: на телефоне фокус в поле немедленно
+    // поднял бы экранную клавиатуру и закрыл приветствие.
+    this.panel.focus();
     log('окно открыто');
   }
 
@@ -222,6 +236,9 @@ export class ChatWidget implements WidgetInstance {
     this.panel.setAttribute('aria-hidden', 'true');
     this.launcher.setAttribute('aria-expanded', 'false');
     this.launcher.setAttribute('aria-label', 'Открыть чат');
+    // Возвращаем фокус туда, откуда пришли: иначе после Esc он оказался бы
+    // нигде, и обход страницы клавиатурой начинался бы с самого начала.
+    this.launcher.focus();
     log('окно закрыто');
   }
 
@@ -246,6 +263,66 @@ export class ChatWidget implements WidgetInstance {
     else if (action === 'close') this.close();
   }
 
+  /**
+   * Esc закрывает окно, Tab не выпускает фокус наружу.
+   *
+   * Удержание фокуса обязательно, раз окно объявлено модальным
+   * (`aria-modal="true"`): в этом режиме программа чтения с экрана игнорирует
+   * всё за пределами диалога, и фокус, ушедший на страницу клиента, оказался бы
+   * для пользователя в невидимой области.
+   */
+  private handleDocumentKeyDown(event: KeyboardEvent): void {
+    if (!this.opened) return;
+
+    if (event.key === 'Escape') {
+      this.close();
+      return;
+    }
+
+    if (event.key === 'Tab') this.trapFocus(event);
+  }
+
+  private trapFocus(event: KeyboardEvent): void {
+    const items = this.focusableItems();
+    const first = items[0];
+    const last = items[items.length - 1];
+
+    if (!first || !last) {
+      event.preventDefault();
+      return;
+    }
+
+    const active = this.shadow.activeElement;
+    const isInside = active !== null && items.some((item) => item === active);
+
+    if (event.shiftKey) {
+      if (isInside && active !== first) return;
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+
+    if (isInside && active !== last) return;
+    event.preventDefault();
+    first.focus();
+  }
+
+  /**
+   * Элементы, которые могут получить фокус прямо сейчас.
+   *
+   * Ссылки и поля перечислены явно: селектор по одному лишь `[tabindex]` поймал
+   * бы и само окно, у которого `tabindex="-1"` — оно нужно как цель
+   * программного фокуса, но не как остановка при обходе.
+   */
+  private focusableItems(): HTMLElement[] {
+    const selector =
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    return Array.from(this.shadow.querySelectorAll<HTMLElement>(selector)).filter(
+      (element) => element.closest('[hidden]') === null,
+    );
+  }
+
   private handleInputKeyDown(event: KeyboardEvent): void {
     // Во время набора иероглифов или через панель ввода Enter подтверждает
     // ввод, а не отправляет сообщение.
@@ -268,6 +345,10 @@ export class ChatWidget implements WidgetInstance {
     this.input.value = '';
     this.autoGrow();
     this.refreshSendState();
+    // Отправка кнопкой делает её неактивной (поле пустое), а неактивный элемент
+    // не может держать фокус — он улетел бы на страницу клиента. Возвращаем
+    // фокус в поле ввода: заодно удобнее писать следующее сообщение.
+    this.input.focus();
 
     // Намеренно без await: отправка не должна задерживать интерфейс, а ошибку
     // разбирает respond. Ключевое слово void явно сообщает линтеру, что промис
