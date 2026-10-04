@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Стенд: одностраничное приложение</title>
+    <link rel="stylesheet" href="/site.css" />
+    <style>
+      .router {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .router button {
+        padding: 8px 14px;
+        border: 1px solid #c8b8a1;
+        border-radius: 8px;
+        background: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .router button[aria-current='page'] {
+        background: #3b2f2a;
+        color: #fff;
+        border-color: #3b2f2a;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Стенд: одностраничное приложение</h1>
+        <p class="tagline">Клиентский роутинг и повторный монтаж</p>
+      </header>
+
+      <p>
+        Здесь страница не перезагружается: переход между «страницами» заменяет содержимое контейнера
+        целиком. Каждый переход дополнительно вызывает
+        <code>ECW.init()</code> заново — ровно так поступает интегратор, который поместил
+        инициализацию виджета в компонент, а компонент перемонтировался (в React это происходит
+        дважды в режиме StrictMode).
+      </p>
+
+      <nav class="router" id="router"></nav>
+      <main id="view"></main>
+    </div>
+
+    <script src="/ecw-widget.iife.js" data-site-id="stand-spa" async></script>
+    <script>
+      // Имитация клиентского роутера. Настоящий фреймворк сделает то же самое:
+      // выбросит содержимое контейнера и построит новое.
+      const routes = [
+        { id: 'home', title: 'Главная', text: 'Мы обжариваем зерно по вторникам.' },
+        { id: 'menu', title: 'Меню', text: 'Эспрессо, фильтр, капучино и выпечка.' },
+        { id: 'contacts', title: 'Контакты', text: 'Виноградная 14, вход со двора.' },
+      ];
+
+      const routerElement = document.getElementById('router');
+      const viewElement = document.getElementById('view');
+
+      function render(activeId) {
+        // Вот здесь контейнер полностью пересоздаётся: у виджета не должно
+        // быть ни одной причины от этого пострадать.
+        routerElement.replaceChildren();
+        viewElement.replaceChildren();
+
+        for (const route of routes) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = route.title;
+          if (route.id === activeId) button.setAttribute('aria-current', 'page');
+          button.addEventListener('click', () => {
+            render(route.id);
+            // Фреймворк перемонтировал компонент с инициализацией виджета —
+            // вызываем повторно и проверяем, что второй виджет не появится.
+            window.ECW?.init({ siteId: 'stand-spa-remount' });
+          });
+          routerElement.append(button);
+        }
+
+        const active = routes.find((route) => route.id === activeId) ?? routes[0];
+        const heading = document.createElement('h2');
+        heading.textContent = active.title;
+        const paragraph = document.createElement('p');
+        paragraph.textContent = active.text;
+        viewElement.append(heading, paragraph);
+      }
+
+      render('home');
+    </script>
+  </body>
+</html>

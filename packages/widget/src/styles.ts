@@ -6,31 +6,6 @@
  */
 export const styles = `
   :host {
-    /* ── Сброс наследуемых свойств ────────────────────────────────────────
-       Сквозь границу Shadow DOM проходят только наследуемые свойства: шрифт,
-       цвет, межстрочный интервал, выравнивание, направление текста. Всё
-       остальное из CSS хозяйской страницы до нас не достаёт. Поэтому сбрасываем
-       именно их — иначе на сайте со шрифтом Georgia наш чат окажется с засечками. */
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    font-size: 15px;
-    font-weight: 400;
-    font-style: normal;
-    font-variant: normal;
-    line-height: 1.45;
-    letter-spacing: normal;
-    word-spacing: normal;
-    text-align: left;
-    text-transform: none;
-    text-indent: 0;
-    text-shadow: none;
-    white-space: normal;
-    word-break: normal;
-    overflow-wrap: break-word;
-    hyphens: none;
-    direction: ltr;
-    color: #1c1c1e;
-    cursor: auto;
-
     /* ── Настройки внешнего вида ──────────────────────────────────────────
        Пользовательские свойства наследуются через границу Shadow DOM в обе
        стороны. Значит, владелец сайта может переопределить их своими стилями,
@@ -55,6 +30,40 @@ export const styles = `
     border: 0;
     background: none;
     box-sizing: border-box;
+  }
+
+  /* ── Сброс наследуемых свойств ───────────────────────────────────────────
+     Сквозь границу Shadow DOM проходят только наследуемые свойства: шрифт,
+     цвет, межстрочный интервал, выравнивание, направление текста. Сбрасываем
+     именно их — иначе на сайте со шрифтом Georgia наш чат окажется с засечками.
+
+     Живёт этот сброс на внутренней обёртке, а НЕ на :host, и это принципиально.
+     Проверено на враждебном стенде: правило страницы вида
+     «звёздочка с font-family и !important» матчит сам host-элемент (он находится
+     в светлом DOM), а для host-элемента правила внешнего дерева сильнее правил
+     :host. Внутрь теневого дерева селекторы страницы не достают вообще, поэтому
+     объявление на этой обёртке побеждает наследование при любой важности —
+     наследование проигрывает любому собственному объявлению. */
+  .ecw-root {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 15px;
+    font-weight: 400;
+    font-style: normal;
+    font-variant: normal;
+    line-height: 1.45;
+    letter-spacing: normal;
+    word-spacing: normal;
+    text-align: left;
+    text-transform: none;
+    text-indent: 0;
+    text-shadow: none;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    direction: ltr;
+    color: #1c1c1e;
+    cursor: auto;
     -webkit-font-smoothing: antialiased;
   }
 

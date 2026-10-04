@@ -165,6 +165,9 @@ export class ChatWidget implements WidgetInstance {
     applyStyles(shadow);
 
     const container = document.createElement('div');
+    // Обёртка, на которой держится сброс наследуемых свойств: до неё селекторы
+    // страницы клиента не достают. Подробности — в styles.ts и ADR-010.
+    container.className = 'ecw-root';
     container.innerHTML = MARKUP;
     shadow.append(container);
 
