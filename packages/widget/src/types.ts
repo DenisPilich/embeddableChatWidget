@@ -1,10 +1,25 @@
-import type { SiteId } from '@ecw/shared';
+import type { ChatMessage, SiteId } from '@ecw/shared';
 
 /** Параметры инициализации виджета. */
 export interface InitOptions {
   /** Публичный идентификатор сайта, полученный в дашборде. */
   siteId: SiteId;
 }
+
+/** Состояние доставки сообщения. Существует только на клиенте. */
+export type MessageStatus = 'pending' | 'sent' | 'failed';
+
+/**
+ * Сообщение в том виде, в каком его показывает интерфейс: часть серверного
+ * контракта из `@ecw/shared` плюс состояние доставки, которого на сервере нет.
+ *
+ * Именно так и задумано: отображение опирается на общий контракт, поэтому в
+ * Фазе 2 настоящие сообщения с сервера лягут в тот же код без переделки
+ * интерфейса.
+ */
+export type WidgetMessage = Pick<ChatMessage, 'id' | 'authorKind' | 'body' | 'createdAt'> & {
+  status: MessageStatus;
+};
 
 /**
  * Минимальный набор действий, который публичный API ожидает от экземпляра

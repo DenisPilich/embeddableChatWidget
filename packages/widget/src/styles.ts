@@ -215,17 +215,196 @@ export const styles = `
     outline-offset: 1px;
   }
 
+  /* ── Переписка ──────────────────────────────────────────────────────── */
+
   .ecw-body {
     flex: 1;
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
     padding: 16px;
+    overscroll-behavior: contain;
   }
 
-  .ecw-placeholder {
-    margin: 24px 0 0;
-    color: #8a8f98;
-    font-size: 13px;
-    text-align: center;
+  .ecw-log {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    /* Пока сообщений мало, они держатся у нижнего края — как в мессенджерах. */
+    margin-top: auto;
+  }
+
+  .ecw-message {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    max-width: 85%;
+  }
+
+  /* Класс .ecw-message задаёт display: flex, а он перебивает стандартное
+     [hidden] { display: none } из стилей браузера. Без этого правила скрытый
+     индикатор набора остался бы видимым. */
+  .ecw-message[hidden] {
+    display: none;
+  }
+
+  .ecw-message--visitor {
+    align-self: flex-end;
+    align-items: flex-end;
+  }
+
+  .ecw-message__bubble {
+    padding: 10px 14px;
+    border-radius: 14px;
+    border-bottom-left-radius: 4px;
+    background: #f1f2f6;
+    color: #1c1c1e;
+    /* Сообщение может быть многострочным: Shift+Enter переносит строку. */
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .ecw-message--visitor .ecw-message__bubble {
+    border-radius: 14px;
+    border-bottom-right-radius: 4px;
+    background: var(--ecw-primary);
+    color: #fff;
+  }
+
+  .ecw-message__time {
+    margin-top: 4px;
+    font-size: 11px;
+    color: #9aa0a6;
+  }
+
+  .ecw-message--visitor[data-status='pending'] .ecw-message__bubble {
+    opacity: 0.65;
+  }
+
+  .ecw-message--visitor[data-status='failed'] .ecw-message__bubble {
+    background: #b42318;
+  }
+
+  .ecw-message--visitor[data-status='failed'] .ecw-message__time::after {
+    content: ' — не отправлено';
+    color: #b42318;
+  }
+
+  /* ── Индикатор набора ───────────────────────────────────────────────── */
+
+  .ecw-message--typing .ecw-message__bubble {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 14px;
+  }
+
+  .ecw-typing-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #9aa0a6;
+    animation: ecw-typing 1.2s infinite ease-in-out;
+  }
+
+  .ecw-typing-dot:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+
+  .ecw-typing-dot:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+
+  @keyframes ecw-typing {
+    0%,
+    70%,
+    100% {
+      opacity: 0.25;
+    }
+    35% {
+      opacity: 1;
+    }
+  }
+
+  /* ── Поле ввода ─────────────────────────────────────────────────────── */
+
+  .ecw-composer {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 12px;
+    border-top: 1px solid #eceef1;
+    background: #fff;
+  }
+
+  .ecw-input {
+    flex: 1;
+    min-height: 38px;
+    max-height: 120px;
+    padding: 9px 12px;
+    border: 1px solid #d9dce1;
+    border-radius: 10px;
+    /* Элементы форм не наследуют шрифт от родителя. Без этого строка в поле
+       ввода оказалась бы системным шрифтом вместо шрифта виджета. */
+    font: inherit;
+    color: inherit;
+    background: #fff;
+    resize: none;
+    overflow-y: auto;
+  }
+
+  .ecw-input::placeholder {
+    color: #9aa0a6;
+  }
+
+  .ecw-input:focus-visible {
+    outline: 2px solid var(--ecw-primary);
+    outline-offset: -1px;
+    border-color: transparent;
+  }
+
+  .ecw-send {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: var(--ecw-primary);
+    color: #fff;
+    cursor: pointer;
+    transition:
+      background-color 120ms ease,
+      opacity 120ms ease;
+  }
+
+  .ecw-send:hover:not(:disabled) {
+    background: var(--ecw-primary-hover);
+  }
+
+  .ecw-send:disabled {
+    background: #d9dce1;
+    cursor: default;
+  }
+
+  .ecw-send:focus-visible {
+    outline: 2px solid var(--ecw-primary);
+    outline-offset: 2px;
+  }
+
+  /* Текст, который видят только программы чтения с экрана. */
+  .ecw-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 
   /* ── Узкие экраны ───────────────────────────────────────────────────── */
@@ -253,6 +432,11 @@ export const styles = `
     .ecw-launcher,
     .ecw-launcher__icon {
       transition: none;
+    }
+
+    .ecw-typing-dot {
+      animation: none;
+      opacity: 0.6;
     }
   }
 `;
