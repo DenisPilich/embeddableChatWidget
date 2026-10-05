@@ -3,6 +3,7 @@ import { reply } from './assistant';
 import { mustFind, pickMountNode } from './dom';
 import { log } from './logger';
 import { MessagesView } from './messages-view';
+import { loadHistory, saveHistory } from './storage';
 import { applyStyles } from './styles';
 import type { InitOptions, MessageStatus, WidgetInstance, WidgetMessage } from './types';
 import { createId, delay } from './utils';
@@ -18,6 +19,12 @@ const GREETING = 'Здравствуйте! Спросите про часы р�
 
 /** Предельная высота поля ввода в пикселях: дальше оно начинает прокручиваться. */
 const INPUT_MAX_HEIGHT = 120;
+
+/**
+ * С какого числа непрочитанных показывать «9+».
+ * Точное число в углу кнопки всё равно не читается, а место занимает.
+ */
+const UNREAD_LIMIT = 9;
 
 /**
  * Разметка виджета.
@@ -127,6 +134,7 @@ const MARKUP = `
         />
       </svg>
     </span>
+    <span class="ecw-badge" aria-hidden="true" hidden></span>
   </button>
 `;
 
@@ -137,10 +145,15 @@ const MARKUP = `
  * host-элемента, а не только в поле класса: так стили внутри shadow root могут
  * на него реагировать (`:host([data-ecw-open])`), и в devtools видно, что
  * происходит.
+ *
+ * Список сообщений живёт здесь, а не в представлении: представление умеет
+ * только показывать, а хранить, отдавать в хранилище и считать непрочитанные —
+ * дело виджета.
  */
 export class ChatWidget implements WidgetInstance {
   private readonly host: HTMLElement;
   private readonly launcher: HTMLButtonElement;
+  private readonly badge: HTMLElement;
   private readonly panel: HTMLElement;
   private readonly input: HTMLTextAreaElement;
   private readonly sendButton: HTMLButtonElement;
@@ -148,9 +161,11 @@ export class ChatWidget implements WidgetInstance {
   private readonly shadow: ShadowRoot;
   private readonly messages: MessagesView;
   private readonly onDocumentKeyDown: (event: KeyboardEvent) => void;
+  private readonly history: WidgetMessage[] = [];
   private opened = false;
+  private unread = 0;
 
-  constructor(options: InitOptions) {
+  constructor(private readonly options: InitOptions) {
     this.host = document.createElement('div');
     this.host.setAttribute(HOST_ATTRIBUTE, '');
     // Атрибут нужен только для отладки: на чужой странице он сразу отвечает
@@ -166,13 +181,14 @@ export class ChatWidget implements WidgetInstance {
 
     const container = document.createElement('div');
     // Обёртка, на которой держится сброс наследуемых свойств: до неё селекторы
-    // страницы клиента не достают. Подробности — в styles.ts и ADR-010.
+    // страницы клиента не достают. Подробности — в styles.css и ADR-010.
     container.className = 'ecw-root';
     container.innerHTML = MARKUP;
     shadow.append(container);
 
     this.panel = mustFind<HTMLElement>(shadow, '.ecw-panel');
     this.launcher = mustFind<HTMLButtonElement>(shadow, '.ecw-launcher');
+    this.badge = mustFind<HTMLElement>(shadow, '.ecw-badge');
     this.input = mustFind<HTMLTextAreaElement>(shadow, '[data-ecw-input]');
     this.sendButton = mustFind<HTMLButtonElement>(shadow, '[data-ecw-send]');
     this.composer = mustFind<HTMLFormElement>(shadow, '[data-ecw-composer]');
@@ -207,7 +223,14 @@ export class ChatWidget implements WidgetInstance {
     mount.append(this.host);
     log(`виджет добавлен в <${mount.tagName.toLowerCase()}>`);
 
-    this.messages.append(this.createMessage('ai', GREETING));
+    this.restoreHistory();
+    if (this.history.length === 0) {
+      // Приветствие показываем только в пустой переписке: возвращаться к
+      // разговору с ним посреди уже начатого диалога было бы странно.
+      this.appendMessage(this.createMessage('ai', GREETING));
+    }
+
+    this.refreshLauncher();
     this.refreshSendState();
     // Высота выставляется сразу, а не при первом нажатии: иначе поле ввода
     // чуть подрастает при вводе первого символа.
@@ -219,8 +242,9 @@ export class ChatWidget implements WidgetInstance {
     this.opened = true;
     this.host.setAttribute(OPEN_ATTRIBUTE, '');
     this.panel.removeAttribute('aria-hidden');
-    this.launcher.setAttribute('aria-expanded', 'true');
-    this.launcher.setAttribute('aria-label', 'Закрыть чат');
+    // Открытие окна — признак того, что посетитель прочитал всё, что пришло.
+    this.unread = 0;
+    this.refreshLauncher();
     // Пока окно было скрыто, в нём могли появиться сообщения — показываем
     // последнее из них.
     this.messages.scrollToLatest();
@@ -237,8 +261,7 @@ export class ChatWidget implements WidgetInstance {
     this.opened = false;
     this.host.removeAttribute(OPEN_ATTRIBUTE);
     this.panel.setAttribute('aria-hidden', 'true');
-    this.launcher.setAttribute('aria-expanded', 'false');
-    this.launcher.setAttribute('aria-label', 'Открыть чат');
+    this.refreshLauncher();
     // Возвращаем фокус туда, откуда пришли: иначе после Esc он оказался бы
     // нигде, и обход страницы клавиатурой начинался бы с самого начала.
     this.launcher.focus();
@@ -343,7 +366,7 @@ export class ChatWidget implements WidgetInstance {
     if (!body) return;
 
     const outgoing = this.createMessage('visitor', body, 'pending');
-    this.messages.append(outgoing);
+    this.appendMessage(outgoing);
 
     this.input.value = '';
     this.autoGrow();
@@ -364,18 +387,94 @@ export class ChatWidget implements WidgetInstance {
       // В Фазе 2 здесь будет настоящий запрос к серверу, а подтверждение
       // доставки придёт от него.
       await delay(150);
-      this.messages.setStatus(outgoing.id, 'sent');
+      this.updateStatus(outgoing.id, 'sent');
 
       this.messages.setTyping(true);
       const answer = await reply(outgoing.body);
       this.messages.setTyping(false);
 
-      this.messages.append(this.createMessage('ai', answer));
+      this.appendMessage(this.createMessage('ai', answer));
+      this.registerIncoming();
     } catch (error) {
       this.messages.setTyping(false);
-      this.messages.setStatus(outgoing.id, 'failed');
+      this.updateStatus(outgoing.id, 'failed');
       console.error('[ecw] не удалось получить ответ', error);
     }
+  }
+
+  /**
+   * Добавляет сообщение: в список, в представление и в хранилище.
+   *
+   * Единая точка нужна, чтобы эти три места не разъезжались. Любое новое
+   * сообщение обязано проходить здесь.
+   */
+  private appendMessage(message: WidgetMessage): void {
+    this.history.push(message);
+    this.messages.append(message);
+    this.persist();
+  }
+
+  /** Меняет состояние доставки — тоже во всех трёх местах сразу. */
+  private updateStatus(id: string, status: MessageStatus): void {
+    const message = this.history.find((candidate) => candidate.id === id);
+    if (message) message.status = status;
+
+    this.messages.setStatus(id, status);
+    this.persist();
+  }
+
+  private persist(): void {
+    saveHistory(this.options.siteId, this.history);
+  }
+
+  /**
+   * Восстанавливает переписку из хранилища.
+   *
+   * Сообщения вставляются напрямую, минуя appendMessage: сохранять только что
+   * прочитанное обратно в хранилище незачем.
+   */
+  private restoreHistory(): void {
+    const restored = loadHistory(this.options.siteId);
+    if (restored.length === 0) return;
+
+    for (const message of restored) {
+      this.history.push(message);
+      this.messages.append(message);
+    }
+
+    this.messages.scrollToLatest();
+    log(`переписка восстановлена: ${restored.length} сообщений`);
+  }
+
+  /**
+   * Учитывает сообщение, пришедшее без открытого окна.
+   *
+   * Именно так работает счётчик непрочитанных: посетитель свернул чат, ответ
+   * пришёл — он должен увидеть это на кнопке, иначе ответа он не заметит.
+   */
+  private registerIncoming(): void {
+    if (this.opened) return;
+    this.unread += 1;
+    this.refreshLauncher();
+  }
+
+  /** Приводит кнопку запуска в соответствие состоянию: подпись и счётчик. */
+  private refreshLauncher(): void {
+    this.launcher.setAttribute('aria-expanded', String(this.opened));
+    this.launcher.setAttribute('aria-label', this.launcherLabel());
+    this.badge.hidden = this.unread === 0;
+    if (this.unread > 0) {
+      this.badge.textContent =
+        this.unread > UNREAD_LIMIT ? `${UNREAD_LIMIT}+` : String(this.unread);
+    }
+  }
+
+  private launcherLabel(): string {
+    if (this.opened) return 'Закрыть чат';
+    // Число непрочитанных озвучивается словами: точка с цифрой для программы
+    // чтения с экрана — просто «один», без смысла.
+    if (this.unread > 0) return `Открыть чат, новых сообщений: ${this.unread}`;
+    return 'Открыть чат';
   }
 
   /**

@@ -1,21 +1,40 @@
 {
-  "name": "@ecw/widget",
+  "name": "ecw-widget",
   "version": "0.1.0",
-  "private": true,
+  "description": "Встраиваемый чат-виджет: загрузчик в 592 байта, изоляция через Shadow DOM, ленивая загрузка",
+  "license": "MIT",
+  "keywords": [
+    "chat",
+    "chat-widget",
+    "widget",
+    "embeddable",
+    "shadow-dom",
+    "customer-support"
+  ],
   "type": "module",
+  "sideEffects": true,
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "main": "./dist/ecw-widget.js",
   "module": "./dist/ecw-widget.js",
-  "dependencies": {
-    "@ecw/shared": "workspace:*"
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/ecw-widget.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
-    "build": "vite build && vite build --config vite.loader.config.ts",
+    "build": "vite build && vite build --config vite.loader.config.ts && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@ecw/shared": "workspace:*",
     "typescript": "6.0.3",
     "vite": "^8.3.2"
   }

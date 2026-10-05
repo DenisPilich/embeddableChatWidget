@@ -24,6 +24,9 @@ test-results/
 playwright-report/
 blob-report/
 
+# Архивы пакетов: их создаёт npm pack, в репозитории им делать нечего.
+*.tgz
+
 # Редакторы и ОС
 .DS_Store
 Thumbs.db

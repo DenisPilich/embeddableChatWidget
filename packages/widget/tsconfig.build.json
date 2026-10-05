@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Объявления типов для тех, кто ставит пакет из npm и импортирует его
+    // сборщиком. В браузерном файле типы не нужны, но опубликованный пакет
+    // без них бесполезен для TypeScript-проектов.
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "declarationMap": false,
+    // Без явного rootDir TypeScript 6 отказывается собирать объявления:
+    // иначе структура папок в dist повторяла бы структуру исходников.
+    "rootDir": "src",
+    "outDir": "dist/types"
+  },
+  "include": ["src"]
+}

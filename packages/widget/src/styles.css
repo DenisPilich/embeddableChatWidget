@@ -135,6 +135,25 @@
   transform: none;
 }
 
+/* Счётчик непрочитанных висит на кнопке запуска: посетитель свернул чат, ответ
+   пришёл — иначе он этого просто не заметит. */
+.ecw-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #fff;
+}
+
 /* ── Окно чата ──────────────────────────────────────────────────────── */
 
 .ecw-panel {
