@@ -18,6 +18,9 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
+    // Запускается командой `pnpm db:seed`. tsx нужен потому, что Node не умеет
+    // исполнять TypeScript напрямую, а сид написан на нём — как и весь проект.
+    seed: 'tsx prisma/seed.ts',
   },
   datasource: {
     url: env('DIRECT_URL'),
