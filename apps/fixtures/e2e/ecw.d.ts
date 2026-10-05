@@ -17,5 +17,10 @@ declare global {
       toggle(): void;
       isOpen(): boolean;
     };
+    /**
+     * Отметки для тестов, которые ставит сам тест через addInitScript.
+     * В коде виджета их нет — это инструмент наблюдения снаружи.
+     */
+    __ecwProbe?: { bundleAtLoad: boolean | null };
   }
 }

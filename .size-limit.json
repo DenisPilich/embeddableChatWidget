@@ -1,5 +1,11 @@
 [
   {
+    "name": "загрузчик (IIFE, gzip)",
+    "path": "packages/widget/dist/ecw-loader.iife.js",
+    "limit": "2 kB",
+    "gzip": true
+  },
+  {
     "name": "виджет на странице клиента (IIFE, gzip)",
     "path": "packages/widget/dist/ecw-widget.iife.js",
     "limit": "15 kB",

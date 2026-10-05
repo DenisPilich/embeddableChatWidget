@@ -12,8 +12,7 @@
     "@ecw/shared": "workspace:*"
   },
   "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch",
+    "build": "vite build && vite build --config vite.loader.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
