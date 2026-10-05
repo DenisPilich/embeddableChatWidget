@@ -9,6 +9,11 @@
     "jsx": "preserve",
     "allowJs": true,
     "incremental": true,
+    // Сокращение @/ для импортов внутри приложения: так принято в Next.js.
+    // Без него пути вида ../../lib/prisma быстро становятся нечитаемыми.
+    "paths": {
+      "@/*": ["./*"]
+    },
     "plugins": [{ "name": "next" }]
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
