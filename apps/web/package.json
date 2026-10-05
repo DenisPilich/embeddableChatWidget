@@ -1,0 +1,31 @@
+{
+  "name": "@ecw/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "prisma generate && next build",
+    "start": "next start --port 3000",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@ecw/shared": "workspace:*",
+    "@prisma/adapter-neon": "^7.10.0",
+    "@prisma/client": "7.10.0",
+    "dotenv": "^18.0.5",
+    "next": "16.3.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "prisma": "7.10.0",
+    "typescript": "6.0.3"
+  }
+}

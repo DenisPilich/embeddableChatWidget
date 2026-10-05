@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Приложение работает и в браузере, и на сервере, поэтому нужен и DOM,
+    // и типы Node.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    // Next.js сам превращает JSX в код — компилятор только проверяет типы.
+    "jsx": "preserve",
+    "allowJs": true,
+    "incremental": true,
+    "plugins": [{ "name": "next" }]
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

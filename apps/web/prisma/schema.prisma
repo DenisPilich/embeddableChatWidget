@@ -1,0 +1,193 @@
+// Схема данных. Postgres в Neon.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Строк подключения здесь больше нет: в Prisma 7 они переехали.
+  //   * для миграций — в prisma.config.ts, там прямое соединение;
+  //   * для работы приложения — в адаптер драйвера, см. lib/prisma.ts.
+  // Это не косметика: приложению нужен пулер соединений, а миграциям — прямое
+  // подключение, и держать их в одном месте было нельзя.
+}
+
+// ── Люди по нашу сторону ────────────────────────────────────────────────────
+
+/// Сотрудник: владелец сайта или оператор поддержки.
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String?
+  passwordHash String?
+  createdAt    DateTime     @default(now())
+  memberships  Membership[]
+
+  @@map("users")
+}
+
+/// Рабочее пространство — команда. Лежит НАД сайтами: один человек может
+/// обслуживать несколько сайтов, и без этого уровня пришлось бы заводить
+/// отдельный аккаунт на каждый.
+model Workspace {
+  id          String       @id @default(cuid())
+  name        String
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+  sites       Site[]
+
+  @@map("workspaces")
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  AGENT
+}
+
+/// Связь человека с рабочим пространством и его роль в нём.
+model Membership {
+  id          String         @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        MembershipRole @default(AGENT)
+  createdAt   DateTime       @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@map("memberships")
+}
+
+// ── Сайты клиентов ──────────────────────────────────────────────────────────
+
+model Site {
+  id        String   @id @default(cuid())
+  workspaceId String
+  name      String
+  createdAt DateTime @default(now())
+
+  /// Публичный ключ виджета. Секретом НЕ является: он виден в HTML любого
+  /// клиента. Защита строится не на его секретности, а на проверке Origin.
+  publicKey String @unique
+
+  /// Список доменов, с которых разрешено обращаться к API этого сайта.
+  /// Без него чужой человек, скопировав publicKey со страницы, сможет слать
+  /// сообщения в базу и жечь бюджет ассистента.
+  allowedOrigins String[]
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  visitors      Visitor[]
+  conversations Conversation[]
+  aiConfig      AiConfig?
+  tokenUsage    TokenUsage[]
+
+  @@index([workspaceId])
+  @@map("sites")
+}
+
+/// Настройки ассистента для конкретного сайта.
+model AiConfig {
+  id              String  @id @default(cuid())
+  siteId          String  @unique
+  systemPrompt    String
+  model           String
+  temperature     Float   @default(0.3)
+  /// Суточный предел расхода токенов. Без него публичное демо выжигает
+  /// бесплатную квоту за час.
+  dailyTokenBudget Int    @default(100000)
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@map("ai_configs")
+}
+
+/// Учёт израсходованных токенов по дням.
+model TokenUsage {
+  id     String   @id @default(cuid())
+  siteId String
+  day    DateTime @db.Date
+  tokens Int      @default(0)
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, day])
+  @@map("token_usage")
+}
+
+// ── Посетители и переписка ──────────────────────────────────────────────────
+
+/// Посетитель сайта клиента.
+///
+/// Отдельная сущность, а не «сессия»: человек возвращается, и без него нельзя
+/// ни показать историю вернувшемуся, ни отличить сто посетителей по одному
+/// сообщению от одного спамера на сто сообщений.
+model Visitor {
+  id         String   @id @default(cuid())
+  siteId     String
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  site          Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@index([siteId])
+  @@map("visitors")
+}
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+}
+
+/// Диалог. Всё, что к нему относится, привязано к siteId — это граница
+/// разграничения доступа между клиентами.
+model Conversation {
+  id        String             @id @default(cuid())
+  siteId    String
+  visitorId String
+  status    ConversationStatus @default(OPEN)
+
+  /// Монотонный номер последнего сообщения.
+  /// По нему клиент просит «всё, что после N» — так периодический опрос не даёт
+  /// ни дублей, ни пропусков.
+  lastSeq Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site     Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  visitor  Visitor   @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([siteId, status])
+  @@index([visitorId])
+  @@map("conversations")
+}
+
+enum MessageAuthor {
+  VISITOR
+  AI
+  AGENT
+}
+
+model Message {
+  id             String        @id @default(cuid())
+  conversationId String
+  /// Порядковый номер внутри диалога. Вместе с conversationId уникален — это
+  /// защищает от двойной вставки при повторной отправке.
+  seq            Int
+  author         MessageAuthor
+  /// Кто именно ответил, если это человек. Для посетителя и ассистента пусто.
+  authorUserId   String?
+  body           String
+  createdAt      DateTime      @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, seq])
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}

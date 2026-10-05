@@ -4,6 +4,7 @@ node_modules/
 # Сборка
 dist/
 *.tsbuildinfo
+.next/
 
 # Окружение и секреты
 .env
