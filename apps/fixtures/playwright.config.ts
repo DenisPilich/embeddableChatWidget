@@ -1,6 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
+import { apiBase, readSeed } from './e2e/api-helpers';
 
 const BASE_URL = 'http://localhost:5173';
+
+/**
+ * Сервер приложения поднимаем только если база наполнена.
+ *
+ * Требовать живую базу от каждого, кто склонировал репозиторий, нельзя: проверки
+ * виджета от неё не зависят. Нет данных наполнения — нет второго сервера, а
+ * тесты API пропускаются.
+ */
+const seed = readSeed();
 
 export default defineConfig({
   testDir: './e2e',
@@ -33,17 +43,29 @@ export default defineConfig({
     },
   ],
 
-  // Playwright сам поднимает стенд перед тестами и гасит его после.
+  // Playwright сам поднимает стенды перед тестами и гасит их после.
   //
   // Сборка виджета здесь намеренно НЕ выполняется, хотя логично было бы:
   // команда webServer целиком пропускается, когда Playwright переиспользует уже
   // запущенный сервер (reuseExistingServer). Тогда тесты молча проверяли бы
   // старый собранный файл — зелёный прогон на сломанном коде. Сборка живёт в
   // скрипте test:e2e, где её нельзя пропустить.
-  webServer: {
-    command: 'pnpm --filter @ecw/fixtures dev',
-    url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: 'pnpm --filter @ecw/fixtures dev',
+      url: BASE_URL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    ...(seed
+      ? [
+          {
+            command: 'pnpm --filter @ecw/web dev',
+            url: apiBase,
+            reuseExistingServer: !process.env.CI,
+            timeout: 180_000,
+          },
+        ]
+      : []),
+  ],
 });

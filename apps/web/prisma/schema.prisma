@@ -176,18 +176,25 @@ enum MessageAuthor {
 model Message {
   id             String        @id @default(cuid())
   conversationId String
-  /// Порядковый номер внутри диалога. Вместе с conversationId уникален — это
-  /// защищает от двойной вставки при повторной отправке.
+  /// Порядковый номер внутри диалога. Уникален вместе с conversationId —
+  /// это защищает от случайной двойной вставки.
   seq            Int
   author         MessageAuthor
   /// Кто именно ответил, если это человек. Для посетителя и ассистента пусто.
   authorUserId   String?
+  /// Идентификатор, который присвоил клиент. На нём держится идемпотентность:
+  /// если ответ не дошёл и виджет повторит отправку, второго сообщения не будет.
+  /// Пусто у сообщений ассистента и оператора — им повторная отправка не грозит.
+  clientId       String?
   body           String
   createdAt      DateTime      @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, seq])
+  /// Postgres считает пустые значения различными, поэтому сообщения без clientId
+  /// под это ограничение не попадают и друг с другом не конфликтуют.
+  @@unique([conversationId, clientId])
   @@index([conversationId, createdAt])
   @@map("messages")
 }

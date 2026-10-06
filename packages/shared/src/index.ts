@@ -36,3 +36,42 @@ export interface ChatMessage {
   /** Момент создания в формате ISO 8601. */
   createdAt: string;
 }
+
+/** Ответ на первый запрос виджета. */
+export interface InitResponse {
+  /** Подписанный токен. Виджет приносит его в заголовке Authorization. */
+  token: string;
+  conversationId: string;
+  /** Номер последнего сообщения в диалоге на момент ответа. */
+  lastSeq: number;
+}
+
+/** Ответ на выборку новых сообщений. */
+export interface MessagesResponse {
+  messages: ChatMessage[];
+  /** Номер последнего отданного сообщения: его клиент запомнит как курсор. */
+  lastSeq: number;
+}
+
+/** Ответ на отправку сообщения. */
+export interface SendMessageResponse {
+  message: ChatMessage;
+  /** Истина, если сообщение уже было записано раньше: повторная отправка. */
+  duplicate: boolean;
+}
+
+/**
+ * Коды ошибок API.
+ *
+ * Виджет по ним решает, что делать: показать посетителю сообщение, повторить
+ * запрос или сдаться. Поэтому коды машинные и перечислены здесь, а не
+ * «придумываются» на каждом эндпоинте.
+ */
+export type ApiErrorCode =
+  | 'invalid_request'
+  | 'unknown_site'
+  | 'origin_not_allowed'
+  | 'unauthorized'
+  | 'empty_message'
+  | 'conversation_not_found'
+  | 'server_error';

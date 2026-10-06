@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { randomBytes } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
 import { prisma } from '../lib/prisma';
 
 /**
@@ -18,6 +19,9 @@ import { prisma } from '../lib/prisma';
 
 const WORKSPACE_ID = 'ws_local_demo';
 const OWNER_EMAIL = 'demo@example.com';
+
+/** Файл с ключами для автотестов. В репозиторий не попадает — он в .gitignore. */
+const SEED_FILE = new URL('../.seed-sites.json', import.meta.url);
 
 interface SiteSeed {
   id: string;
@@ -61,6 +65,8 @@ async function main(): Promise<void> {
     create: { userId: owner.id, workspaceId: workspace.id, role: 'OWNER' },
   });
 
+  const summary: { id: string; name: string; publicKey: string; allowedOrigins: string[] }[] = [];
+
   for (const seed of SITES) {
     const existing = await prisma.site.findUnique({ where: { id: seed.id } });
 
@@ -95,10 +101,21 @@ async function main(): Promise<void> {
       },
     });
 
+    summary.push({
+      id: site.id,
+      name: site.name,
+      publicKey: site.publicKey,
+      allowedOrigins: site.allowedOrigins,
+    });
+
     console.log(`Сайт «${site.name}»`);
     console.log('  публичный ключ:', site.publicKey);
     console.log('  разрешённые источники:', site.allowedOrigins.join(', '));
   }
+
+  // Ключи для автотестов. Вписывать их в тесты руками нельзя: они случайные, и
+  // после пересоздания базы тесты начали бы падать загадочным образом.
+  writeFileSync(SEED_FILE, `${JSON.stringify({ sites: summary }, null, 2)}\n`, 'utf8');
 
   console.log('Наполнение выполнено.');
 }

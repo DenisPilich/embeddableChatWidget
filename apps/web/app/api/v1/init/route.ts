@@ -1,7 +1,15 @@
-import { NextResponse } from 'next/server';
+import type { InitResponse } from '@ecw/shared';
+import type { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { corsHeaders, isOriginAllowed } from '@/lib/cors';
+import { isOriginAllowed } from '@/lib/cors';
 import { findSiteByPublicKey, resolveOpenConversation, resolveVisitor } from '@/lib/data';
+import {
+  errorResponse,
+  jsonResponse,
+  preflightResponse,
+  readJson,
+  requestOrigin,
+} from '@/lib/http';
 import { signWidgetToken, verifyWidgetToken } from '@/lib/tokens';
 
 /**
@@ -32,25 +40,22 @@ const initSchema = z.object({
 });
 
 export function OPTIONS(request: Request): Response {
-  // На предварительный запрос отвечаем, не проверяя источник: он и нужен,
-  // чтобы браузер вообще разрешил основной запрос. Настоящая проверка — в POST.
-  const origin = request.headers.get('origin') ?? '';
-  return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
+  return preflightResponse(request);
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const origin = request.headers.get('origin') ?? '';
+  const origin = requestOrigin(request);
 
   const parsed = initSchema.safeParse(await readJson(request));
   if (!parsed.success) {
     // Подробности разбора наружу не отдаём: они описывают нашу схему, а не
     // проблему интегратора.
-    return json({ error: 'invalid_request' }, 400, origin);
+    return errorResponse('invalid_request', 400, origin);
   }
 
   const site = await findSiteByPublicKey(parsed.data.siteId);
   if (!site) {
-    return json({ error: 'unknown_site' }, 404, origin);
+    return errorResponse('unknown_site', 404, origin);
   }
 
   if (!isOriginAllowed(origin, site.allowedOrigins)) {
@@ -58,7 +63,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       origin: origin || '(пусто)',
       siteId: site.id,
     });
-    return json({ error: 'origin_not_allowed' }, 403, origin);
+    return errorResponse('origin_not_allowed', 403, origin);
   }
 
   // Токен подписан нами, поэтому посетителя можно узнать. Но только в пределах
@@ -77,26 +82,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     conversationId: conversation.id,
   });
 
-  return json(
-    {
-      token,
-      conversationId: conversation.id,
-      lastSeq: conversation.lastSeq,
-    },
-    200,
-    origin,
-  );
-}
-
-/** Читает тело запроса как JSON, не падая на мусоре. */
-async function readJson(request: Request): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    return null;
-  }
-}
-
-function json(payload: unknown, status: number, origin: string): NextResponse {
-  return NextResponse.json(payload, { status, headers: corsHeaders(origin) });
+  const response: InitResponse = {
+    token,
+    conversationId: conversation.id,
+    lastSeq: conversation.lastSeq,
+  };
+  return jsonResponse(response, 200, origin);
 }

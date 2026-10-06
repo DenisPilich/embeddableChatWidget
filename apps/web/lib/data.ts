@@ -1,4 +1,4 @@
-import type { Conversation, Site, Visitor } from '@prisma/client';
+import type { Conversation, Message, Site, Visitor } from '@prisma/client';
 import { prisma } from './prisma';
 
 /**
@@ -13,6 +13,14 @@ import { prisma } from './prisma';
  * До него siteId ещё неизвестен — мы как раз выясняем, о каком сайте речь.
  * Поэтому у функции особое имя, и она первая в файле.
  */
+
+/** Диалог не найден среди принадлежащих этому сайту. */
+export class ConversationNotFoundError extends Error {
+  constructor() {
+    super('Диалог не найден для этого сайта');
+    this.name = 'ConversationNotFoundError';
+  }
+}
 
 /** Единственный запрос без ограничения по сайту: мы ещё не знаем, какой это сайт. */
 export async function findSiteByPublicKey(publicKey: string): Promise<Site | null> {
@@ -58,4 +66,117 @@ export async function resolveOpenConversation(
   if (existing) return existing;
 
   return prisma.conversation.create({ data: { siteId, visitorId } });
+}
+
+/** Диалог, принадлежащий указанному сайту. Чужой диалог не найдётся. */
+export async function findConversation(
+  siteId: string,
+  conversationId: string,
+): Promise<Conversation | null> {
+  return prisma.conversation.findFirst({ where: { id: conversationId, siteId } });
+}
+
+/**
+ * Сообщения после указанного номера, по возрастанию.
+ *
+ * У сообщения своего `siteId` нет — оно принадлежит диалогу. Поэтому ограничение
+ * идёт через связь: `conversation: { siteId }`. Так его невозможно «забыть»:
+ * без этого условия запрос просто не соберётся.
+ */
+export async function listMessages(params: {
+  siteId: string;
+  conversationId: string;
+  afterSeq: number;
+  limit: number;
+}): Promise<Message[]> {
+  return prisma.message.findMany({
+    where: {
+      conversationId: params.conversationId,
+      conversation: { siteId: params.siteId },
+      seq: { gt: params.afterSeq },
+    },
+    orderBy: { seq: 'asc' },
+    take: params.limit,
+  });
+}
+
+/**
+ * Записывает сообщение посетителя.
+ *
+ * Две нетривиальные вещи, ради которых функция существует отдельно:
+ *
+ * 1. **Идемпотентность.** Виджет присылает свой идентификатор сообщения. Если
+ *    ответ не дошёл и он повторит отправку, второго сообщения не появится —
+ *    вернётся уже записанное.
+ *
+ * 2. **Номер выдаётся атомарно.** Прочитать `lastSeq`, прибавить единицу и
+ *    записать обратно нельзя: два одновременных сообщения получат один номер и
+ *    одно из них потеряется. `UPDATE ... RETURNING` делает и то и другое одной
+ *    операцией, а заодно проверяет, что диалог принадлежит этому сайту.
+ */
+export async function appendVisitorMessage(params: {
+  siteId: string;
+  conversationId: string;
+  clientId: string;
+  body: string;
+}): Promise<{ message: Message; duplicate: boolean }> {
+  const existing = await findMessageByClientId(params.conversationId, params.clientId);
+  if (existing) return { message: existing, duplicate: true };
+
+  const updated = await prisma.$queryRaw<{ lastSeq: number }[]>`
+    UPDATE "conversations"
+    SET "lastSeq" = "lastSeq" + 1, "updatedAt" = NOW()
+    WHERE "id" = ${params.conversationId} AND "siteId" = ${params.siteId}
+    RETURNING "lastSeq"
+  `;
+
+  const seq = updated[0]?.lastSeq;
+  if (seq === undefined) throw new ConversationNotFoundError();
+
+  try {
+    const message = await prisma.message.create({
+      data: {
+        conversationId: params.conversationId,
+        seq,
+        author: 'VISITOR',
+        clientId: params.clientId,
+        body: params.body,
+      },
+    });
+    return { message, duplicate: false };
+  } catch (error) {
+    // Гонка: между проверкой и вставкой то же сообщение успело записаться.
+    // Номер при этом сгорит — в нумерации останется пропуск, и это нормально:
+    // курсору важна монотонность, а не отсутствие дыр.
+    if (isUniqueViolation(error)) {
+      const raced = await findMessageByClientId(params.conversationId, params.clientId);
+      if (raced) return { message: raced, duplicate: true };
+    }
+    throw error;
+  }
+}
+
+async function findMessageByClientId(
+  conversationId: string,
+  clientId: string,
+): Promise<Message | null> {
+  return prisma.message.findUnique({
+    where: { conversationId_clientId: { conversationId, clientId } },
+  });
+}
+
+/**
+ * Нарушение уникальности.
+ *
+ * Проверяем код, а не класс ошибки: класс живёт внутри сгенерированного клиента,
+ * и его расположение менялось между версиями Prisma. Код `P2002` — часть
+ * документированного контракта и переживёт обновление.
+ */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'P2002'
+  );
 }
