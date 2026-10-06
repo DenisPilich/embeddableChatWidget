@@ -1,6 +1,7 @@
 import { readOptionsFromScript } from './config';
 import { whenReady } from './dom';
 import { log } from './logger';
+import { LocalTransport } from './transport-local';
 import { ChatWidget, HOST_ATTRIBUTE } from './widget';
 import type { InitOptions, WidgetInstance } from './types';
 
@@ -62,7 +63,10 @@ export function init(options: InitOptions): void {
   }
 
   try {
-    current.instance = new ChatWidget({ siteId });
+    // Транспорт создаётся здесь и передаётся виджету. Это единственное место,
+    // которое знает, каким способом ходят сообщения: чтобы перейти на настоящий
+    // сервер, меняется ровно эта строка, а виджет остаётся прежним.
+    current.instance = new ChatWidget({ siteId }, new LocalTransport());
     log(`виджет готов: siteId=${siteId}, версия ${version}`);
   } catch (error) {
     // Виджет — гость на чужой странице: выпускать исключение наружу нельзя,

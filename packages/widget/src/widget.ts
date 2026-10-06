@@ -1,12 +1,12 @@
-import type { AuthorKind } from '@ecw/shared';
-import { reply } from './assistant';
+import type { AuthorKind, ChatMessage } from '@ecw/shared';
 import { mustFind, pickMountNode } from './dom';
 import { log } from './logger';
 import { MessagesView } from './messages-view';
 import { loadHistory, saveHistory } from './storage';
 import { applyStyles } from './styles';
+import type { Transport } from './transport';
 import type { InitOptions, MessageStatus, WidgetInstance, WidgetMessage } from './types';
-import { createId, delay } from './utils';
+import { createId } from './utils';
 
 /** Атрибут, по которому host-элемент виджета находится в светлом DOM. */
 export const HOST_ATTRIBUTE = 'data-ecw-host';
@@ -165,7 +165,10 @@ export class ChatWidget implements WidgetInstance {
   private opened = false;
   private unread = 0;
 
-  constructor(private readonly options: InitOptions) {
+  constructor(
+    private readonly options: InitOptions,
+    private readonly transport: Transport,
+  ) {
     this.host = document.createElement('div');
     this.host.setAttribute(HOST_ATTRIBUTE, '');
     // Атрибут нужен только для отладки: на чужой странице он сразу отвечает
@@ -235,6 +238,11 @@ export class ChatWidget implements WidgetInstance {
     // Высота выставляется сразу, а не при первом нажатии: иначе поле ввода
     // чуть подрастает при вводе первого символа.
     this.autoGrow();
+
+    // Подписка на входящие и открытие сессии. Неудачу открытия разбирает тот,
+    // кто создал транспорт: виджету в этот момент показать посетителю нечего.
+    this.transport.onMessages((messages) => this.handleIncoming(messages));
+    void this.transport.connect();
   }
 
   open(): void {
@@ -377,28 +385,46 @@ export class ChatWidget implements WidgetInstance {
     this.input.focus();
 
     // Намеренно без await: отправка не должна задерживать интерфейс, а ошибку
-    // разбирает respond. Ключевое слово void явно сообщает линтеру, что промис
+    // разбирает deliver. Ключевое слово void явно сообщает линтеру, что промис
     // оставлен без ожидания осознанно — этого и требует no-floating-promises.
-    void this.respond(outgoing);
+    void this.deliver(outgoing);
   }
 
-  private async respond(outgoing: WidgetMessage): Promise<void> {
+  /**
+   * Передаёт сообщение транспорту и ждёт подтверждения.
+   *
+   * Подтверждение означает «сервер принял и записал», а не «ассистент ответил».
+   * Ответ придёт отдельно, через подписку: он может не прийти вовсе, и это не
+   * ошибка отправки.
+   */
+  private async deliver(outgoing: WidgetMessage): Promise<void> {
     try {
-      // В Фазе 2 здесь будет настоящий запрос к серверу, а подтверждение
-      // доставки придёт от него.
-      await delay(150);
+      await this.transport.send({ clientId: outgoing.id, body: outgoing.body });
       this.updateStatus(outgoing.id, 'sent');
-
+      // Набор показываем сразу после подтверждения: ответ придёт не мгновенно.
       this.messages.setTyping(true);
-      const answer = await reply(outgoing.body);
-      this.messages.setTyping(false);
-
-      this.appendMessage(this.createMessage('ai', answer));
-      this.registerIncoming();
     } catch (error) {
-      this.messages.setTyping(false);
       this.updateStatus(outgoing.id, 'failed');
-      console.error('[ecw] не удалось получить ответ', error);
+      console.error('[ecw] не удалось отправить сообщение', error);
+    }
+  }
+
+  /** Принимает всё, что транспорт принёс из диалога. */
+  private handleIncoming(incoming: readonly ChatMessage[]): void {
+    if (incoming.length === 0) return;
+
+    // Первое пришедшее сообщение означает, что ответ готов.
+    this.messages.setTyping(false);
+
+    for (const message of incoming) {
+      this.appendMessage({
+        id: message.id,
+        authorKind: message.authorKind,
+        body: message.body,
+        createdAt: message.createdAt,
+        status: 'sent',
+      });
+      this.registerIncoming();
     }
   }
 
