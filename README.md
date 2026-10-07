@@ -1,81 +1,85 @@
 # Embeddable Chat Widget
 
-Встраиваемый чат-виджет: владелец сайта добавляет одну строку `<script>`, и на его странице появляется окно чата, в котором по умолчанию отвечает LLM, а живой оператор подключается только когда нужен.
+An embeddable chat widget: the site owner adds a single `<script>` line and gets a chat window on their page, where an LLM answers by default and a human operator joins only when needed.
 
-> **Статус: планирование завершено, код не начат.** Ниже — что проект собирается доказывать.
+> **Status: phases 1 and 2 are complete.** The widget is published on npm and talks to a live backend. Phase 3 replaces the canned assistant with a real model.
 
-## Зачем этот проект
+## Why this project
 
-Готовых чат-виджетов много, и это не попытка сделать им замену. Проект — проверяемое доказательство двух вещей:
+Chat widgets are not in short supply, and this is not an attempt to replace them. The project is a verifiable demonstration of two things:
 
-1. **Сторонний код может жить на чужой странице и не ломать её.** Изоляция через Shadow DOM, бандл в единицах килобайт, устойчивость к враждебной вёрстке, строгой Content Security Policy, SPA-роутингу и legacy-страницам с jQuery.
-2. **Полный стек реального multi-tenant SaaS:** разграничение данных между клиентами, realtime с автоматической деградацией, стриминг LLM с контролем расхода, воспроизводимый релизный процесс.
+1. **Third-party code can live on someone else's page without breaking it.** Shadow DOM isolation, a bundle measured in kilobytes, and resilience to hostile CSS, strict Content Security Policy, SPA routing and legacy jQuery pages.
+2. **A full real-world multi-tenant SaaS stack:** tenant data isolation, realtime with automatic fallback, streamed LLM output with spend control, and a reproducible release process.
 
-## Что будет в демо
+## What the demo shows
 
-Клик по кнопке на чужой странице → окно чата → ответ AI приходит потоком за секунды. Без регистрации, без «оператор offline».
+Click a button on a third-party page → a chat window opens → an answer arrives within seconds. No sign-up, no "operator offline".
 
-## Стек
+Today that answer comes from a canned assistant. Phase 3 puts a real model behind the same interface, and nothing else has to change.
 
-| Слой | Технологии |
+## Stack
+
+| Layer | Technology |
 |---|---|
-| Виджет | TypeScript, Vite (library mode), Shadow DOM, без фреймворка |
-| Дашборд и API | Next.js, TypeScript, Tailwind, shadcn/ui |
-| Данные | PostgreSQL (Neon), Prisma |
-| Realtime | Поллинг → SSE → push-слой (решение отложено) |
-| AI | Groq за интерфейсом провайдера, стриминг через SSE |
-| Структура | Монорепо, pnpm workspaces |
-| Доставка | npm → jsDelivr, версия в URL обязательна |
+| Widget | TypeScript, Vite (library mode), Shadow DOM, no framework |
+| Dashboard & API | Next.js, TypeScript, Tailwind, shadcn/ui |
+| Data | PostgreSQL (Neon), Prisma |
+| Realtime | Polling → SSE → push layer (decision deferred) |
+| AI | Groq behind a provider interface, streamed over SSE |
+| Layout | Monorepo, pnpm workspaces |
+| Delivery | npm → jsDelivr, version pinned in the URL |
 
-## Документация
+## Documentation
 
-- **[docs/PLAN.md](docs/PLAN.md)** — план по фазам, критерии выхода, риски, чего сознательно не делаем.
-- **[docs/DECISIONS.md](docs/DECISIONS.md)** — журнал архитектурных решений: контекст, альтернативы, последствия.
+- **[docs/PLAN.md](docs/PLAN.md)** — phases, exit criteria, risks, and what we deliberately left out.
+- **[docs/DECISIONS.md](docs/DECISIONS.md)** — architecture decision log: context, alternatives, consequences.
 
-## Разработка
+## Development
 
-После клонирования нужно один раз создать файл с секретами: без него не пройдёт сборка, потому что Prisma CLI проверяет наличие переменных.
+After cloning, create the secrets file once. The build fails without it, because the Prisma CLI validates its variables on every run.
 
 ```powershell
 Copy-Item apps\web\.env.example apps\web\.env
 ```
 
-Значения внутри — заглушки. Для сборки, проверок и автотестов их достаточно; для работы с базой нужно подставить настоящие строки подключения.
+The values inside are placeholders. They are enough for builds, checks and end-to-end tests; talking to a real database needs real connection strings.
 
 ```bash
-pnpm install        # зависимости всех пакетов монорепо
-pnpm dev            # собрать виджет и поднять стенд «чужой сайт» на http://localhost:5173
-pnpm --filter @ecw/web dev   # серверная часть на http://localhost:3000
-pnpm build          # собрать все пакеты
-pnpm typecheck      # проверить типы
-pnpm lint           # проверить код линтером, включая правила, требующие информации о типах
-pnpm lint:fix       # то же с автоматическим исправлением
-pnpm format         # отформатировать код
-pnpm format:check   # проверить форматирование, ничего не меняя
-pnpm verify         # всё сразу: типы, линтер, формат, сборка, бюджет размера
-pnpm size           # только проверка бюджета размера бандла
-pnpm test:e2e       # автотесты в настоящем браузере
+pnpm install        # dependencies for every workspace package
+pnpm dev            # build the widget and serve the "customer site" stands on http://localhost:5173
+pnpm --filter @ecw/web dev   # backend on http://localhost:3000
+pnpm build          # build every package
+pnpm typecheck      # type-check
+pnpm lint           # lint, including rules that need type information
+pnpm lint:fix       # the same, fixing what can be fixed automatically
+pnpm format         # format the code
+pnpm format:check   # check formatting without changing anything
+pnpm verify         # everything at once: types, lint, format, build, size budget
+pnpm size           # bundle size budget only
+pnpm test:e2e       # end-to-end tests in a real browser
 ```
 
-Markdown-документы из форматирования исключены сознательно: Prettier переписывает таблицы в широкие выровненные колонки, отчего исходник становится неудобно читать. Причина записана прямо в `.prettierignore`.
+Markdown is excluded from formatting on purpose: Prettier rewrites tables into wide aligned columns, which makes the source unpleasant to read. The reason is recorded in `.prettierignore` itself.
 
-Стенд в `apps/fixtures` изображает сайт клиента и раздаёт собранные файлы по обычным адресам — `/ecw-loader.iife.js` и `/ecw-widget.iife.js`, — то есть тем же способом, каким они попадут на настоящую страницу с CDN. Стенды подключают именно загрузчик, как это будет делать клиент.
+### Fixture stands
 
-| Страница стенда | Что проверяет |
+The stands in `apps/fixtures` imitate a customer site and serve the built files at the same paths a CDN would — `/ecw-loader.iife.js` and `/ecw-widget.iife.js`. They load the loader, exactly as a customer would.
+
+| Stand page | What it checks |
 |---|---|
-| `/` | Обычная страница: изоляция стилей. Шрифт с засечками — приманка: если текст в виджете окажется с засечками, значит сброс наследуемых свойств сделан неправильно |
-| `/transform-body.html` | `transform` на `<body>`: виджет не должен уезжать из угла окна при прокрутке |
-| `/hostile.html` | Враждебная вёрстка: чужие `!important` на всё, запрет прокрутки, чужой слой с огромным `z-index` |
-| `/csp.html` | Строгая Content Security Policy: встроенные стили и скрипты запрещены |
-| `/spa.html` | Одностраничное приложение: замена содержимого контейнера и повторные вызовы `init` при переходах |
+| `/` | A normal page: style isolation. The serif font is bait — if the widget's text comes out with serifs, inherited properties are not reset correctly |
+| `/transform-body.html` | `transform` on `<body>`: the widget must not drift out of the viewport corner while scrolling |
+| `/hostile.html` | Hostile CSS: foreign `!important` on everything, scrolling disabled, a foreign layer with an enormous `z-index` |
+| `/csp.html` | Strict Content Security Policy: inline styles and scripts are forbidden |
+| `/spa.html` | Single-page app: container content replaced and `init` called again on navigation |
 
-Стенды обращаются не к настоящему серверу, а к его **двойнику** — он живёт внутри стенда (`apps/fixtures/stub-api.ts`) и держит сообщения в памяти. Благодаря этому проверки виджета запускаются без базы, без секретов и без сети. Настоящий сервер проверяется отдельно: `apps/fixtures/e2e/api.spec.ts` работает против Next.js и настоящей базы, а если базы нет — пропускается.
+The stands talk to a **test double** rather than the real backend. It lives inside the stand (`apps/fixtures/stub-api.ts`) and keeps messages in memory, so the widget tests run without a database, without secrets and without the network. The real backend is covered separately: `apps/fixtures/e2e/api.spec.ts` runs against Next.js and a real database, and is skipped when there is none.
 
-Чтобы посмотреть на виджет с настоящим сервером, замените в теге на стенде `data-ecw-api` на `http://localhost:3000` и запустите серверную часть.
+To try the widget against the real backend, point `data-ecw-api` in the stand's script tag at `http://localhost:3000` and start the backend.
 
-Стенды покрыты автотестами Playwright (`apps/fixtures/e2e`). Они проверяют появление виджета, открытие и закрытие окна, отправку сообщения и ответ, изоляцию стилей в обе стороны, поведение при трансформированном `body`, удержание и возврат фокуса, а также то, что разметка в сообщении посетителя не исполняется. Тесты идут на установленном в системе Chrome, поэтому не требуют скачивания отдельного браузера.
+The stands are covered by Playwright tests (`apps/fixtures/e2e`). They check that the widget appears, opens and closes, sends a message and receives an answer, that styles stay isolated in both directions, that a transformed `body` does not break positioning, that focus is trapped and restored, and that markup in a visitor's message is never executed. The tests run on the system Chrome, so no browser download is required.
 
-## Как это будет встраиваться
+## How it gets embedded
 
 ```html
 <script
@@ -85,13 +89,13 @@ Markdown-документы из форматирования исключены
 ></script>
 ```
 
-Загрузчик весит 678 байт gzip: он ждёт, пока страница клиента загрузится, и только потом подтягивает основной файл (7.9 КБ gzip). Так виджет не попадает в критический путь загрузки чужой страницы — а по метрикам загрузки клиента ранжирует поиск.
+The loader weighs 678 bytes gzipped: it waits for the customer's page to finish loading and only then pulls in the main file (7.9 KB gzipped). The widget therefore never lands on the critical path of someone else's page — and search engines rank that page by its loading metrics.
 
-**Версия в ссылке обязательна.** Без неё следующее обновление пакета молча изменит виджет на всех сайтах, куда он уже встроен.
+**The version in the URL is mandatory.** Without it, the next package release would silently change the widget on every site it is already embedded in.
 
-### Адрес серверной части
+### Backend address
 
-По умолчанию виджет обращается к адресу, зашитому при сборке. Тем, кто ставит сервер у себя, он задаётся либо на странице, либо при сборке:
+By default the widget calls the address baked in at build time. Self-hosters can override it on the page or at build time:
 
 ```html
 <script
@@ -107,29 +111,29 @@ $env:ECW_API_URL = 'https://chat.example.com'
 pnpm build
 ```
 
-Загрузчик переносит на основной файл **все** `data-` атрибуты, поэтому новый параметр виджета не требует правки загрузчика. Однажды он переносил только `data-site-id`, и добавленный параметр молча не доезжал до виджета — теперь это сторожит автотест.
+The loader copies **every** `data-` attribute onto the main file, so a new widget option never requires touching the loader. It once copied only `data-site-id`, and the new option silently never reached the widget — an automated test now guards this.
 
-## Публикация пакета
+## Publishing
 
-Пакет опубликован: **`ecw-widget@0.1.0`**. Живая ссылка проверена автотестом — виджет действительно поднимается со стороны CDN, а не только собирается локально.
+The package is published: **`ecw-widget@0.1.0`**. The live URL is verified by a test — the widget really does boot from the CDN, rather than merely building locally.
 
-**npm требует двухфакторную аутентификацию для публикации.** Без неё реестр отвечает `403` с текстом про 2FA и не намекает, что дело в аккаунте, а не в пакете. Рабочих путей два:
+**npm requires two-factor authentication to publish.** Without it the registry answers `403` with a message about 2FA and no hint that the problem is the account rather than the package. There are two workable paths:
 
-1. Включить 2FA и публиковать с кодом из приложения:
+1. Enable 2FA and publish with a code from your authenticator app:
 
 ```powershell
 npm.cmd publish --otp=123456
 ```
 
-2. Или завести **гранулярный токен**: права `Read and write (publish and stage)`, галочка **bypass 2FA**, а в выборе пакетов — **All packages**. Последнее важно: пакет без области имён не подпадает под разрешение, выданное для области `@логин`, и публикация упадёт даже с верным токеном.
+2. Or create a **granular access token**: permission `Read and write (publish and stage)`, the **bypass 2FA** checkbox ticked, and **All packages** selected. That last part matters: an unscoped package is not covered by a permission granted for the `@username` scope, and publishing fails even with an otherwise valid token.
 
 ```powershell
-npm.cmd config set //registry.npmjs.org/:_authToken ТОКЕН
+npm.cmd config set //registry.npmjs.org/:_authToken TOKEN
 ```
 
-Токен окажется в `C:\Users\<ты>\.npmrc` — **вне репозитория**. Флаг `--location=project` использовать нельзя: он записал бы секрет в файл проекта, то есть в git.
+The token lands in `C:\Users\<you>\.npmrc` — **outside the repository**. Never add `--location=project`, which would write the secret into a file tracked by git.
 
-Выпуск следующей версии:
+Releasing the next version:
 
 ```powershell
 cd packages\widget
@@ -137,19 +141,19 @@ npm.cmd version patch
 npm.cmd publish
 ```
 
-**Версия в ссылке обязательна.** Без неё следующая публикация молча изменит виджет на всех сайтах, куда он уже встроен.
+**The version in the URL is mandatory.** Without it, the next release would silently change the widget on every site it is already embedded in.
 
-Проверка, что клиенты получат рабочую ссылку:
+Check that customers will get a working URL:
 
 ```powershell
 $env:ECW_CDN_URL = 'https://cdn.jsdelivr.net/npm/ecw-widget@0.1.0/dist/ecw-loader.iife.js'
 pnpm.cmd --filter @ecw/fixtures test:e2e cdn
 ```
 
-Без этой переменной тест пропускается: проверка, которая падает до первого релиза, приучает игнорировать красное.
+Without that variable the test is skipped: a check that fails before the first release only teaches people to ignore red.
 
-## Известные ограничения
+## Known limitations
 
-Проект рассчитывает на бесплатные тарифы хостинга и потому **проектируется с расчётом на деградацию**: при отказе realtime виджет возвращается на периодический опрос, при исчерпании бюджета токенов честно сообщает об этом и продолжает работать. Демо не должно ломаться целиком ни при каком отказе одного слоя.
+The project targets free hosting tiers and is therefore **designed to degrade**: if realtime fails, the widget falls back to polling; if the token budget runs out, it says so honestly and keeps working. No single layer failing should break the demo entirely.
 
-Ограничения окружения, найденные на машине разработки, собраны в [docs/PLAN.md](docs/PLAN.md#7-рабочая-среда-проверено-на-этой-машине).
+Environment quirks found on the development machine are collected in [docs/PLAN.md](docs/PLAN.md#7-рабочая-среда-проверена-на-этой-машине).
