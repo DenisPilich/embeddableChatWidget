@@ -1,6 +1,20 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { STUB_REPLY_PREFIX } from '../stub-api';
 import { HOST } from './helpers';
+
+/**
+ * Версия читается из package.json, а не вписана числом.
+ *
+ * Так тест не приходится править при каждом выпуске — а если бы приходилось,
+ * однажды его забудут, и проверка «версия в сборке совпадает с версией пакета»
+ * превратится в проверку «версия совпадает с тем, что вписали год назад».
+ */
+const widgetVersion = (
+  JSON.parse(
+    readFileSync(new URL('../../../packages/widget/package.json', import.meta.url), 'utf8'),
+  ) as { version: string }
+).version;
 
 test.describe('виджет на странице клиента', () => {
   test.beforeEach(async ({ page }) => {
@@ -11,7 +25,7 @@ test.describe('виджет на странице клиента', () => {
     await expect(page.locator(HOST)).toHaveCount(1);
 
     const version = await page.evaluate(() => window.ECW?.version);
-    expect(version).toBe('0.1.1');
+    expect(version).toBe(widgetVersion);
   });
 
   test('повторная инициализация не создаёт второй виджет', async ({ page }) => {

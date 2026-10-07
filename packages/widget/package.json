@@ -1,7 +1,7 @@
 {
   "name": "ecw-widget",
-  "version": "0.1.1",
-  "description": "Встраиваемый чат-виджет: загрузчик в 592 байта, изоляция через Shadow DOM, ленивая загрузка",
+  "version": "0.1.2",
+  "description": "Embeddable chat widget: a 678-byte loader, Shadow DOM isolation, lazy loading",
   "license": "MIT",
   "keywords": [
     "chat",
@@ -31,7 +31,8 @@
   },
   "scripts": {
     "build": "vite build && vite build --config vite.loader.config.ts && tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
   },
   "devDependencies": {
     "@ecw/shared": "workspace:*",
