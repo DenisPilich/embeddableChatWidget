@@ -11,7 +11,7 @@ test.describe('виджет на странице клиента', () => {
     await expect(page.locator(HOST)).toHaveCount(1);
 
     const version = await page.evaluate(() => window.ECW?.version);
-    expect(version).toBe('0.1.0');
+    expect(version).toBe('0.1.1');
   });
 
   test('повторная инициализация не создаёт второй виджет', async ({ page }) => {

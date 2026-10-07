@@ -1,6 +1,6 @@
 {
   "name": "ecw-widget",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Встраиваемый чат-виджет: загрузчик в 592 байта, изоляция через Shadow DOM, ленивая загрузка",
   "license": "MIT",
   "keywords": [
