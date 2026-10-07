@@ -35,7 +35,7 @@ test.describe('строгая Content Security Policy', () => {
     await expect(page.locator('.ecw-panel')).toBeVisible();
 
     const input = page.locator('.ecw-input');
-    await input.fill('привет');
+    await input.fill('hello');
     await input.press('Enter');
 
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble').last()).toContainText(

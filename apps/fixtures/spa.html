@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Стенд: одностраничное приложение</title>
+    <title>Stand: single-page application</title>
     <link rel="stylesheet" href="/site.css" />
     <style>
       .router {
@@ -31,16 +31,15 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>Стенд: одностраничное приложение</h1>
-        <p class="tagline">Клиентский роутинг и повторный монтаж</p>
+        <h1>Stand: single-page application</h1>
+        <p class="tagline">Client-side routing and repeated mounting</p>
       </header>
 
       <p>
-        Здесь страница не перезагружается: переход между «страницами» заменяет содержимое контейнера
-        целиком. Каждый переход дополнительно вызывает
-        <code>ECW.init()</code> заново — ровно так поступает интегратор, который поместил
-        инициализацию виджета в компонент, а компонент перемонтировался (в React это происходит
-        дважды в режиме StrictMode).
+        The page never reloads here: moving between "pages" replaces the whole content of the
+        container. Every transition also calls <code>ECW.init()</code> again — exactly what an
+        integrator does when widget initialisation lives inside a component and that component gets
+        remounted (in React this happens twice in StrictMode).
       </p>
 
       <nav class="router" id="router"></nav>
@@ -57,9 +56,13 @@
       // Имитация клиентского роутера. Настоящий фреймворк сделает то же самое:
       // выбросит содержимое контейнера и построит новое.
       const routes = [
-        { id: 'home', title: 'Главная', text: 'Мы обжариваем зерно по вторникам.' },
-        { id: 'menu', title: 'Меню', text: 'Эспрессо, фильтр, капучино и выпечка.' },
-        { id: 'contacts', title: 'Контакты', text: 'Виноградная 14, вход со двора.' },
+        { id: 'home', title: 'Home', text: 'We roast our beans on Tuesdays.' },
+        { id: 'menu', title: 'Menu', text: 'Espresso, filter, cappuccino and pastries.' },
+        {
+          id: 'contacts',
+          title: 'Contacts',
+          text: 'Vinogradnaya 14, the entrance is from the courtyard.',
+        },
       ];
 
       const routerElement = document.getElementById('router');

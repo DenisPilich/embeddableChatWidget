@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Стенд: строгая Content Security Policy</title>
+    <title>Stand: strict Content Security Policy</title>
 
     <!--
       Строгая политика безопасности. Ключевое для нас здесь — style-src 'self'
@@ -26,26 +26,27 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>Стенд: строгая Content Security Policy</h1>
-        <p class="tagline">Встроенные стили и скрипты запрещены политикой</p>
+        <h1>Stand: strict Content Security Policy</h1>
+        <p class="tagline">Inline styles and scripts are forbidden by policy</p>
       </header>
 
       <p>
-        Эта страница отдаёт заголовок политики, в котором разрешены только файлы с того же домена:
-        <code>style-src 'self'</code> и <code>script-src 'self'</code>. Встроенные стили запрещены.
+        This page serves a policy header that only allows files from its own origin:
+        <code>style-src 'self'</code> and <code>script-src 'self'</code>. Inline styles are
+        forbidden.
       </p>
 
-      <h2>Что должно быть видно</h2>
+      <h2>What you should see</h2>
       <p>
-        Виджет должен выглядеть как обычно: цветная кнопка, белое окно со скруглёнными углами, тени.
-        Если он превратился в голый текст без оформления — значит выбранный способ внедрения стилей
-        не работает, и вывод ADR-008 неверен.
+        The widget should look the way it always does: a coloured button, a white window with
+        rounded corners, shadows. If it turned into bare text without styling, the chosen way of
+        injecting styles does not work and the conclusion in ADR-008 is wrong.
       </p>
 
-      <h2>Зачем это проверять</h2>
+      <h2>Why this is worth checking</h2>
       <p>
-        Строгую политику ставят себе банки, госсайты и всё, что прошло аудит. Виджет, который на них
-        ломается, бесполезен ровно там, где клиенты платят больше всего.
+        Banks, government sites and anything that has passed an audit set themselves a strict
+        policy. A widget that breaks on them is useless exactly where customers pay the most.
       </p>
     </div>
 

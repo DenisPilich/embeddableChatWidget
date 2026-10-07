@@ -7,7 +7,7 @@ async function sendAndClose(page: Page): Promise<void> {
   await page.locator('.ecw-launcher').click();
 
   const input = page.locator('.ecw-input');
-  await input.fill('привет');
+  await input.fill('hello');
   await input.press('Enter');
 
   await page.keyboard.press('Escape');
@@ -27,7 +27,7 @@ test.describe('счётчик непрочитанных', () => {
     // не значит ничего.
     await expect(page.locator('.ecw-launcher')).toHaveAttribute(
       'aria-label',
-      'Открыть чат, новых сообщений: 1',
+      'Open chat, new messages: 1',
     );
   });
 
@@ -41,7 +41,7 @@ test.describe('счётчик непрочитанных', () => {
     await page.locator('.ecw-launcher').click();
 
     await expect(badge).toBeHidden();
-    await expect(page.locator('.ecw-launcher')).toHaveAttribute('aria-label', 'Закрыть чат');
+    await expect(page.locator('.ecw-launcher')).toHaveAttribute('aria-label', 'Close chat');
   });
 
   test('ответ при открытом окне счётчик не увеличивает', async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe('счётчик непрочитанных', () => {
     await page.locator('.ecw-launcher').click();
 
     const input = page.locator('.ecw-input');
-    await input.fill('привет');
+    await input.fill('hello');
     await input.press('Enter');
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble').last()).toContainText(
       STUB_REPLY_PREFIX,

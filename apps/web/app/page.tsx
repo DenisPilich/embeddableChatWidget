@@ -18,11 +18,11 @@ export default function HomePage() {
     >
       <h1>Embeddable Chat Widget</h1>
       <p>
-        Это серверная часть проекта. Сам виджет живёт в <code>packages/widget</code>, дашборд
-        оператора появится здесь же в Фазе 5.
+        This is the backend of the project. The widget itself lives in <code>packages/widget</code>;
+        the operator dashboard will appear right here in phase 5.
       </p>
       <p>
-        Проверка работоспособности: <a href="/api/health">/api/health</a>
+        Health check: <a href="/api/health">/api/health</a>
       </p>
     </main>
   );

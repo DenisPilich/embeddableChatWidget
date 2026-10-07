@@ -7,7 +7,7 @@ test.describe('переписка переживает перезагрузку'
     await page.locator('.ecw-launcher').click();
 
     const input = page.locator('.ecw-input');
-    await input.fill('во сколько вы работаете');
+    await input.fill('what are your opening hours');
     await input.press('Enter');
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble').last()).toContainText(
       STUB_REPLY_PREFIX,
@@ -16,23 +16,25 @@ test.describe('переписка переживает перезагрузку'
     await page.reload();
 
     await expect(page.locator('.ecw-message--visitor .ecw-message__bubble')).toHaveText(
-      'во сколько вы работаете',
+      'what are your opening hours',
     );
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble').last()).toContainText(
       STUB_REPLY_PREFIX,
     );
     // Приветствие не добавляется второй раз: в переписке оно ровно одно.
-    // Сообщений ассистента при этом два — приветствие и ответ, — и это верно:
-    // приветствие тоже часть переписки и сохраняется вместе с ней.
-    await expect(page.locator('.ecw-message--ai', { hasText: 'Здравствуйте' })).toHaveCount(1);
+    // Сообщений ассистента при этом два — helloствие и ответ, — и это верно:
+    // helloствие тоже часть переписки и сохраняется вместе с ней.
+    await expect(
+      page.locator('.ecw-message--ai', { hasText: 'Ask about our opening hours' }),
+    ).toHaveCount(1);
   });
 
-  test('в пустой переписке показывается приветствие', async ({ page }) => {
+  test('в пустой переписке показывается helloствие', async ({ page }) => {
     await page.goto('/');
 
     await expect(page.locator('.ecw-message--ai')).toHaveCount(1);
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble')).toContainText(
-      'Здравствуйте',
+      'Ask about our opening hours',
     );
   });
 
@@ -52,7 +54,7 @@ test.describe('переписка переживает перезагрузку'
     await page.locator('.ecw-launcher').click();
 
     const input = page.locator('.ecw-input');
-    await input.fill('привет');
+    await input.fill('hello');
     await input.press('Enter');
 
     await expect(page.locator('.ecw-message--visitor')).toHaveCount(1);
@@ -69,17 +71,17 @@ test.describe('переписка переживает перезагрузку'
     await page.evaluate(() => {
       localStorage.setItem(
         'ecw:stand-kofeynya:history:v1',
-        '{"version":1,"messages":[{"id":42},{"id":"ok","body":"привет"}]}',
+        '{"version":1,"messages":[{"id":42},{"id":"ok","body":"hello"}]}',
       );
     });
     await page.reload();
 
-    // Мусор отброшен, показывается приветствие, виджет продолжает работать.
+    // Мусор отброшен, показывается helloствие, виджет продолжает работать.
     await expect(page.locator('.ecw-message--ai')).toHaveCount(1);
 
     await page.locator('.ecw-launcher').click();
     const input = page.locator('.ecw-input');
-    await input.fill('привет');
+    await input.fill('hello');
     await input.press('Enter');
 
     await expect(page.locator('.ecw-message--visitor')).toHaveCount(1);

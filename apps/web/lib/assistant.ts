@@ -19,32 +19,33 @@ interface ReplyRule {
 
 const RULES: readonly ReplyRule[] = [
   {
-    match: /привет|здравств|добрый (день|вечер|утро)|доброе утро/i,
-    answer: 'Здравствуйте! Чем могу помочь?',
+    match: /hello|hi\b|hey|good (morning|afternoon|evening)/i,
+    answer: 'Hello! How can I help?',
   },
   {
-    match: /час|врем|работ|открыт|закрыт|график|выходн/i,
-    answer: 'Мы открыты с 8:00 до 21:00 по будням, в субботу до 22:00, в воскресенье до 19:00.',
-  },
-  {
-    match: /адрес|найти|где вы|как добраться|проезд|карт/i,
+    match: /hour|time|open|close|schedule|weekend|when/i,
     answer:
-      'Виноградная 14, вход со двора. Если увидите очередь на улице — она движется быстрее, чем кажется.',
+      'We are open 8:00 to 21:00 on weekdays, until 22:00 on Saturday and until 19:00 on Sunday.',
   },
   {
-    match: /зерн|обжар|кофе|помол|сорт|арабик|робуст/i,
+    match: /address|where|find|direction|map|located/i,
     answer:
-      'Обжариваем сами, по вторникам. Есть светлая, средняя и тёмная обжарка — расскажем, что взять под ваш способ заваривания.',
+      'Vinogradnaya 14, the entrance is from the courtyard. If there is a queue outside, it moves faster than it looks.',
   },
   {
-    match: /спасибо|благодар/i,
-    answer: 'Пожалуйста! Обращайтесь.',
+    match: /bean|roast|coffee|grind|origin|arabica|robusta/i,
+    answer:
+      'We roast our own beans, every Tuesday. Light, medium and dark are all on the shelf — tell us how you brew and we will pick one.',
+  },
+  {
+    match: /thank/i,
+    answer: 'You are welcome. Anything else?',
   },
 ];
 
 const FALLBACK =
-  'Это демонстрационный ответ: настоящий ассистент появится, когда виджет подключат к модели. ' +
-  'Пока спросите про часы работы или как нас найти.';
+  'This is a demonstration answer: the real assistant arrives once the widget is connected to a model. ' +
+  'For now, try asking about our opening hours or how to find us.';
 
 /** Возвращает ответ на сообщение посетителя. */
 export async function generateReply(question: string): Promise<string> {

@@ -52,7 +52,7 @@ test.describe('управление фокусом', () => {
 
   test('после отправки фокус остаётся в поле ввода', async ({ page }) => {
     const input = page.locator('.ecw-input');
-    await input.fill('привет');
+    await input.fill('hello');
     await input.press('Enter');
 
     // Кнопка отправки становится неактивной, а неактивный элемент не может

@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Стенд: трансформированный body</title>
+    <title>Stand: transformed body</title>
     <link rel="stylesheet" href="/site.css" />
     <style>
       /*
@@ -22,66 +22,68 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>Стенд: трансформированный body</h1>
-        <p class="tagline">Проверка того, что виджет не уезжает</p>
+        <h1>Stand: transformed body</h1>
+        <p class="tagline">Checking that the widget does not drift away</p>
       </header>
 
       <p>
-        У этой страницы на <code>&lt;body&gt;</code> висит <code>transform: translateZ(0)</code>.
-        Так делают, чтобы «перевести отрисовку на видеокарту», и это ломает
-        <code>position: fixed</code> у потомков.
+        This page has <code>transform: translateZ(0)</code> on its <code>&lt;body&gt;</code>. It is
+        a common trick to "hand rendering over to the GPU", and it breaks
+        <code>position: fixed</code> for every descendant.
       </p>
 
-      <h2>Что должно быть видно</h2>
+      <h2>What you should see</h2>
       <p>
-        Кнопка виджета должна остаться в правом нижнем углу <em>окна</em>, а не страницы. Прокрутите
-        вниз: если кнопка уехала вверх вместе с содержимым — защита не сработала.
+        The widget button must stay in the bottom right corner of the <em>viewport</em>, not of the
+        page. Scroll down: if the button travelled up with the content, the safeguard failed.
       </p>
 
-      <h2>Зачем столько текста</h2>
+      <h2>Why so much text</h2>
       <p>
-        Без прокрутки разницу не увидеть, поэтому ниже — длинный текст. Он здесь только для того,
-        чтобы страница прокручивалась.
-      </p>
-
-      <p>
-        Обжарка бывает светлой, средней и тёмной. Светлая сохраняет кислотность и фруктовые ноты, но
-        требует более тонкой настройки помола: недожарить легко, пережарить ещё легче. Тёмная даёт
-        горечь и шоколад, она прощает ошибки и потому так популярна в автоматических кофемашинах.
+        Without scrolling there is nothing to see, so the text below is long on purpose. It exists
+        only to make the page scrollable.
       </p>
 
       <p>
-        Вода важнее зерна, хотя в это не хочется верить. Жёсткость, минерализация и температура
-        влияют на экстракцию сильнее, чем страна происхождения: на мягкой воде даже среднее зерно
-        раскрывается, а на пересоленной не спасёт ничего.
+        Roasts come in light, medium and dark. A light roast keeps acidity and fruity notes but
+        demands a finer grind setting: under-roasted is easy, over-roasted is easier. A dark roast
+        gives bitterness and chocolate, forgives mistakes, and is therefore so popular in automatic
+        machines.
       </p>
 
       <p>
-        Помол — единственная переменная, которую можно менять, не покупая ничего нового. Крупнее
-        помол — быстрее проходит вода, слабее экстракция, кислее вкус. Мельче помол — вода
-        задерживается, экстракция идёт дальше, вкус становится горше и плотнее.
+        Water matters more than the bean, tempting as it is to believe otherwise. Hardness,
+        mineralisation and temperature affect extraction more than the country of origin: soft water
+        opens up even an average bean, and nothing rescues a brew made with over-salted water.
       </p>
 
       <p>
-        Температура заваривания обычно лежит между 90 и 96 градусами. Ниже — недотянутая
-        кислотность, выше — горечь и риск обжечь зерно. Для светлой обжарки берут температуру
-        повыше, для тёмной — пониже, потому что тёмное зерно уже отдало часть вкуса на огне.
+        Grind is the only variable you can change without buying anything new. Coarser grind — water
+        passes faster, extraction is weaker, the cup tastes more sour. Finer grind — water lingers,
+        extraction goes further, the cup turns bitter and dense.
       </p>
 
       <p>
-        Пропорция — вопрос привычки, но начинать стоит с шестидесяти граммов зерна на литр воды.
-        Дальше регулируйте по вкусу: слишком крепко — добавьте воды, слишком пусто — уменьшите
-        помол, а не увеличивайте дозу.
+        Brewing temperature usually sits between 90 and 96 degrees. Below that the acidity is
+        underdeveloped, above it you get bitterness and a risk of scorching the bean. Light roasts
+        take a higher temperature, dark roasts a lower one, because a dark bean has already given up
+        part of its flavour over the fire.
       </p>
 
       <p>
-        И последнее: свежесть. Через две недели после обжарки зерно заметно теряет в аромате, а
-        через месяц его уже не спасёт никакая настройка помола. Поэтому мы обжариваем по вторникам и
-        не держим запасов.
+        Ratio is a matter of habit, but start with sixty grams of coffee per litre of water. Adjust
+        by taste afterwards: too strong — add water; too thin — grind finer rather than adding more
+        coffee.
+      </p>
+
+      <p>
+        And finally, freshness. Two weeks after roasting the bean has noticeably lost aroma, and a
+        month later no grind setting will save it. That is why we roast on Tuesdays and keep no
+        stock.
       </p>
 
       <footer>
-        <p>© Кофейня «Тучка». Стенд для разработки виджета, содержимое вымышленное.</p>
+        <p>© Little Cloud Coffee. A widget development stand, the content is fictional.</p>
       </footer>
     </div>
 

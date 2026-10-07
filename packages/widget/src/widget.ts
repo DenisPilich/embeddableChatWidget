@@ -15,7 +15,7 @@ export const HOST_ATTRIBUTE = 'data-ecw-host';
 const OPEN_ATTRIBUTE = 'data-ecw-open';
 
 /** Приветствие ассистента. В Фазе 5 текст будет приходить из настроек сайта. */
-const GREETING = 'Здравствуйте! Спросите про часы работы или как нас найти.';
+const GREETING = 'Hello! Ask about our opening hours or how to find us.';
 
 /** Предельная высота поля ввода в пикселях: дальше оно начинает прокручиваться. */
 const INPUT_MAX_HEIGHT = 120;
@@ -42,20 +42,20 @@ const MARKUP = `
     class="ecw-panel"
     role="dialog"
     aria-modal="true"
-    aria-label="Чат"
+    aria-label="Chat"
     aria-hidden="true"
     tabindex="-1"
   >
     <header class="ecw-header">
       <div class="ecw-header__text">
-        <p class="ecw-header__title">Чат</p>
-        <p class="ecw-header__status">Отвечает ассистент</p>
+        <p class="ecw-header__title">Chat</p>
+        <p class="ecw-header__status">Assistant replies</p>
       </div>
       <button
         type="button"
         class="ecw-icon-button"
         data-ecw-action="close"
-        aria-label="Закрыть чат"
+        aria-label="Close chat"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
           <path
@@ -72,14 +72,14 @@ const MARKUP = `
     <div
       class="ecw-body"
       role="log"
-      aria-label="Переписка"
+      aria-label="Conversation"
       aria-live="polite"
       aria-relevant="additions"
       tabindex="0"
     >
       <div class="ecw-log">
         <div class="ecw-message ecw-message--typing" hidden>
-          <span class="ecw-visually-hidden">Ассистент печатает</span>
+          <span class="ecw-visually-hidden">Assistant is typing</span>
           <div class="ecw-message__bubble" aria-hidden="true">
             <span class="ecw-typing-dot"></span>
             <span class="ecw-typing-dot"></span>
@@ -90,17 +90,17 @@ const MARKUP = `
     </div>
 
     <form class="ecw-composer" data-ecw-composer novalidate>
-      <label class="ecw-visually-hidden" for="ecw-input">Сообщение</label>
+      <label class="ecw-visually-hidden" for="ecw-input">Message</label>
       <textarea
         id="ecw-input"
         class="ecw-input"
         name="message"
         rows="1"
-        placeholder="Написать сообщение…"
+        placeholder="Write a message…"
         autocomplete="off"
         data-ecw-input
       ></textarea>
-      <button type="submit" class="ecw-send" aria-label="Отправить сообщение" disabled data-ecw-send>
+      <button type="submit" class="ecw-send" aria-label="Send message" disabled data-ecw-send>
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor" />
         </svg>
@@ -112,7 +112,7 @@ const MARKUP = `
     type="button"
     class="ecw-launcher"
     data-ecw-action="toggle"
-    aria-label="Открыть чат"
+    aria-label="Open chat"
     aria-expanded="false"
   >
     <span class="ecw-launcher__icon ecw-launcher__icon--chat" aria-hidden="true">
@@ -496,11 +496,11 @@ export class ChatWidget implements WidgetInstance {
   }
 
   private launcherLabel(): string {
-    if (this.opened) return 'Закрыть чат';
+    if (this.opened) return 'Close chat';
     // Число непрочитанных озвучивается словами: точка с цифрой для программы
     // чтения с экрана — просто «один», без смысла.
-    if (this.unread > 0) return `Открыть чат, новых сообщений: ${this.unread}`;
-    return 'Открыть чат';
+    if (this.unread > 0) return `Open chat, new messages: ${String(this.unread)}`;
+    return 'Open chat';
   }
 
   /**

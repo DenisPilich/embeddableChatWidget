@@ -19,7 +19,7 @@ import type { Connect, Plugin } from 'vite';
  */
 
 /** Начало ответа двойника. По нему тесты отличают ответ от местного приветствия. */
-export const STUB_REPLY_PREFIX = 'Заглушка: получила';
+export const STUB_REPLY_PREFIX = 'Stub reply to';
 
 interface StubMessage {
   id: string;
@@ -191,7 +191,7 @@ export function stubApi(): Plugin {
         const own = push(conversation, 'visitor', text, clientId);
         // Ответ готовится здесь же, как на настоящем сервере: к моменту опроса
         // он уже лежит в диалоге.
-        push(conversation, 'ai', `${STUB_REPLY_PREFIX} «${text}»`);
+        push(conversation, 'ai', `${STUB_REPLY_PREFIX} "${text}"`);
         send(res, 201, { message: own, duplicate: false });
         return;
       }

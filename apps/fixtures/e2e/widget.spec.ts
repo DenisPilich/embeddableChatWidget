@@ -46,12 +46,12 @@ test.describe('виджет на странице клиента', () => {
     await page.locator('.ecw-launcher').click();
 
     const input = page.locator('.ecw-input');
-    await input.fill('во сколько вы работаете');
+    await input.fill('what are your opening hours');
     await input.press('Enter');
 
     // Сообщение появляется сразу, до ответа: интерфейс оптимистичный.
     await expect(page.locator('.ecw-message--visitor .ecw-message__bubble')).toHaveText(
-      'во сколько вы работаете',
+      'what are your opening hours',
     );
 
     // Сначала индикатор набора, затем ответ. Отвечает не виджет, а сервер: здесь
@@ -90,7 +90,7 @@ test.describe('виджет на странице клиента', () => {
     await input.fill('   ');
     await expect(send).toBeDisabled();
 
-    await input.fill('привет');
+    await input.fill('hello');
     await expect(send).toBeEnabled();
   });
 
@@ -98,11 +98,11 @@ test.describe('виджет на странице клиента', () => {
     await page.locator('.ecw-launcher').click();
 
     const input = page.locator('.ecw-input');
-    await input.fill('первая строка');
+    await input.fill('first line');
     await input.press('Shift+Enter');
-    await input.type('вторая строка');
+    await input.type('second line');
 
-    await expect(input).toHaveValue('первая строка\nвторая строка');
+    await expect(input).toHaveValue('first line\nsecond line');
     await expect(page.locator('.ecw-message--visitor')).toHaveCount(0);
   });
 });

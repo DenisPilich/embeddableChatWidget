@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Стенд: враждебная вёрстка</title>
+    <title>Stand: hostile layout</title>
     <link rel="stylesheet" href="/site.css" />
 
     <!--
@@ -66,28 +66,28 @@
 
     <div class="wrap odd-layout">
       <header>
-        <h1>Стенд: враждебная вёрстка</h1>
-        <p class="tagline">Проверка того, что виджет выживает на чужой странице</p>
+        <h1>Stand: hostile layout</h1>
+        <p class="tagline">Checking that the widget survives someone else's page</p>
       </header>
 
       <p>
-        Здесь всё сделано «как получилось»: шрифт Comic Sans с
-        <code>!important</code>, тройной межстрочный интервал, разряженные буквы, запрет прокрутки и
-        чужой слой с гигантским <code>z-index</code>.
+        Everything here is done "however it turned out": Comic Sans with
+        <code>!important</code>, triple line spacing, stretched letters, scrolling disabled and a
+        foreign layer with a gigantic <code>z-index</code>.
       </p>
 
-      <h2>Что должно быть видно</h2>
+      <h2>What you should see</h2>
       <p>
-        Кнопка виджета — в правом нижнем углу, поверх красноватого чужого слоя. Текст внутри виджета
-        — обычным шрифтом без засечек, с обычным межстрочным интервалом, в обычном регистре. Если он
-        стал похож на эту страницу, значит изоляция не работает.
+        The widget button sits in the bottom right corner, above the reddish foreign layer. The text
+        inside the widget keeps a plain sans-serif font, normal line spacing and normal casing. If
+        it started to look like this page, the isolation is not working.
       </p>
 
-      <h2>Почему это важно</h2>
+      <h2>Why this matters</h2>
       <p>
-        Виджет встраивают на страницы, которые писали другие люди и за которые мы не отвечаем. Мы не
-        можем попросить их убрать <code>!important</code> или починить <code>z-index</code> —
-        единственный выход в том, чтобы наш код не зависел от их вёрстки.
+        The widget gets embedded into pages written by other people, pages we are not responsible
+        for. We cannot ask them to drop <code>!important</code> or fix their <code>z-index</code> —
+        the only way out is for our code not to depend on their markup.
       </p>
     </div>
 

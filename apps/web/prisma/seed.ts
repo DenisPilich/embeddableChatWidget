@@ -32,7 +32,7 @@ interface SiteSeed {
 const SITES: readonly SiteSeed[] = [
   {
     id: 'site_local_stand',
-    name: 'Стенд «Кофейня Тучка»',
+    name: 'Stand "Little Cloud Coffee"',
     allowedOrigins: ['http://localhost:5173', 'http://127.0.0.1:5173'],
   },
   {
@@ -41,7 +41,7 @@ const SITES: readonly SiteSeed[] = [
     // должен открывать что-либо на втором. Без второго сайта эту проверку
     // поставить не на чем.
     id: 'site_local_other',
-    name: 'Стенд «Второй сайт»',
+    name: 'Stand "Second site"',
     allowedOrigins: ['http://localhost:5174'],
   },
 ];
@@ -94,7 +94,7 @@ async function main(): Promise<void> {
       create: {
         siteId: site.id,
         systemPrompt:
-          'Ты ассистент кофейни «Тучка». Отвечай коротко и по делу, не выдумывай факты, которых нет в описании сайта.',
+          'You are the assistant of the "Little Cloud" coffee shop. Answer briefly and do not invent facts that are not on the site.',
         model: 'demo-assistant',
         temperature: 0.3,
         dailyTokenBudget: 50_000,
@@ -108,9 +108,9 @@ async function main(): Promise<void> {
       allowedOrigins: site.allowedOrigins,
     });
 
-    console.log(`Сайт «${site.name}»`);
-    console.log('  публичный ключ:', site.publicKey);
-    console.log('  разрешённые источники:', site.allowedOrigins.join(', '));
+    console.log(`Site "${site.name}"`);
+    console.log('  public key:', site.publicKey);
+    console.log('  allowed origins:', site.allowedOrigins.join(', '));
   }
 
   // Ключи для автотестов. Вписывать их в тесты руками нельзя: они случайные, и
