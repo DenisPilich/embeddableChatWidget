@@ -3,7 +3,8 @@ import type { Message } from '@prisma/client';
 import type { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { authenticateWidget } from '@/lib/auth';
-import { ConversationNotFoundError, appendVisitorMessage, listMessages } from '@/lib/data';
+import { generateReply } from '@/lib/assistant';
+import { ConversationNotFoundError, appendMessage, listMessages } from '@/lib/data';
 import {
   errorResponse,
   jsonResponse,
@@ -83,12 +84,32 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!body) return errorResponse('empty_message', 400, origin);
 
   try {
-    const { message, duplicate } = await appendVisitorMessage({
+    const { message, duplicate } = await appendMessage({
       siteId: claims.siteId,
       conversationId: claims.conversationId,
+      author: 'VISITOR',
       clientId: parsed.data.clientId,
       body,
     });
+
+    // Ответ ассистента. Повторную отправку пропускаем: ответ на неё уже есть,
+    // иначе каждый повтор порождал бы новую реплику.
+    //
+    // Ошибка ассистента не должна ломать отправку: сообщение посетителя уже
+    // записано, и оператор увидит вопрос — пусть и без ответа.
+    if (!duplicate) {
+      try {
+        const answer = await generateReply(body);
+        await appendMessage({
+          siteId: claims.siteId,
+          conversationId: claims.conversationId,
+          author: 'AI',
+          body: answer,
+        });
+      } catch (error) {
+        console.error('[ecw] не удалось получить ответ ассистента', error);
+      }
+    }
 
     const response: SendMessageResponse = { message: toWireMessage(message), duplicate };
     // Повторная отправка ничего не создала — отвечаем как за обычный успех.
@@ -111,6 +132,10 @@ function toWireMessage(message: Message): ChatMessage {
     authorKind: AUTHOR_KIND[message.author],
     body: message.body,
     createdAt: message.createdAt.toISOString(),
+    // Пустое поле не добавляем вовсе: у сообщений ассистента и оператора
+    // клиентского идентификатора нет, и `clientId: undefined` в ответе был бы
+    // шумом, который потребитель может принять за значение.
+    ...(message.clientId === null ? {} : { clientId: message.clientId }),
   };
 }
 

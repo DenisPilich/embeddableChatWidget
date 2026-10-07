@@ -33,6 +33,15 @@ const LOAD_TIMEOUT_MS = 3500;
 interface LoaderOptions {
   siteId: string;
   bundleUrl: string;
+  /**
+   * Все data-атрибуты тега загрузчика.
+   *
+   * Переносятся целиком, а не по одному: перечислить их поимённо означало бы,
+   * что каждый новый параметр виджета надо не забыть добавить и сюда. Забыть
+   * легко, а ошибка при этом молчаливая — параметр просто не доедет, и виджет
+   * будет вести себя не так, как написано в документации.
+   */
+  attributes: Record<string, string>;
 }
 
 let scheduled = false;
@@ -53,10 +62,17 @@ function readOptions(): LoaderOptions | null {
   const siteId = script.dataset.siteId?.trim();
   if (!siteId || !script.src) return null;
 
+  const attributes: Record<string, string> = {};
+  for (const attribute of script.attributes) {
+    if (attribute.name.startsWith('data-') && attribute.name !== BUNDLE_ATTRIBUTE) {
+      attributes[attribute.name] = attribute.value;
+    }
+  }
+
   // Адрес основного файла выводим из адреса самого загрузчика. Клиенту
   // достаточно одной ссылки, и версия в ней одна на оба файла — иначе они
   // однажды разъедутся.
-  return { siteId, bundleUrl: new URL(BUNDLE_FILE, script.src).href };
+  return { siteId, bundleUrl: new URL(BUNDLE_FILE, script.src).href, attributes };
 }
 
 function injectBundle(options: LoaderOptions): void {
@@ -72,8 +88,13 @@ function injectBundle(options: LoaderOptions): void {
   script.setAttribute(BUNDLE_ATTRIBUTE, '');
   // Основной файл читает параметры из собственного тега — ровно так же, как
   // читал бы их у клиента при прямой вставке. Поэтому достаточно перенести
-  // атрибут, и основной файл не знает, что его кто-то загрузил.
-  script.dataset.siteId = options.siteId;
+  // атрибуты, и основной файл не знает, что его кто-то загрузил.
+  for (const [name, value] of Object.entries(options.attributes)) {
+    script.setAttribute(name, value);
+  }
+  // Значение с обрезанными пробелами важнее исходного: проверка выше уже
+  // убедилась, что оно непустое.
+  script.setAttribute('data-site-id', options.siteId);
   document.head.append(script);
 }
 

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { STUB_REPLY_PREFIX } from '../stub-api';
 import { HOST } from './helpers';
 
 test.describe('виджет на странице клиента', () => {
@@ -53,10 +54,12 @@ test.describe('виджет на странице клиента', () => {
       'во сколько вы работаете',
     );
 
-    // Сначала индикатор набора, затем ответ ассистента.
+    // Сначала индикатор набора, затем ответ. Отвечает не виджет, а сервер: здесь
+    // стоит его двойник, и по пометке в ответе видно, что круг замкнулся —
+    // сообщение ушло, дошло и вернулось в общий список диалога.
     await expect(page.locator('.ecw-message--typing')).toBeVisible();
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble').last()).toContainText(
-      '8:00',
+      STUB_REPLY_PREFIX,
     );
   });
 

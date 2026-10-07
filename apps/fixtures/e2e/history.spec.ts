@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { STUB_REPLY_PREFIX } from '../stub-api';
 
 test.describe('переписка переживает перезагрузку', () => {
   test('сообщения восстанавливаются после перезагрузки страницы', async ({ page }) => {
@@ -9,7 +10,7 @@ test.describe('переписка переживает перезагрузку'
     await input.fill('во сколько вы работаете');
     await input.press('Enter');
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble').last()).toContainText(
-      '8:00',
+      STUB_REPLY_PREFIX,
     );
 
     await page.reload();
@@ -18,7 +19,7 @@ test.describe('переписка переживает перезагрузку'
       'во сколько вы работаете',
     );
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble').last()).toContainText(
-      '8:00',
+      STUB_REPLY_PREFIX,
     );
     // Приветствие не добавляется второй раз: в переписке оно ровно одно.
     // Сообщений ассистента при этом два — приветствие и ответ, — и это верно:
@@ -56,7 +57,7 @@ test.describe('переписка переживает перезагрузку'
 
     await expect(page.locator('.ecw-message--visitor')).toHaveCount(1);
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble').last()).toContainText(
-      'Здравствуйте',
+      STUB_REPLY_PREFIX,
     );
   });
 

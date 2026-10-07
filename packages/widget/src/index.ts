@@ -1,7 +1,7 @@
-import { readOptionsFromScript } from './config';
+import { readOptionsFromScript, resolveApiUrl } from './config';
 import { whenReady } from './dom';
 import { log } from './logger';
-import { LocalTransport } from './transport-local';
+import { HttpTransport } from './transport-http';
 import { ChatWidget, HOST_ATTRIBUTE } from './widget';
 import type { InitOptions, WidgetInstance } from './types';
 
@@ -63,11 +63,12 @@ export function init(options: InitOptions): void {
   }
 
   try {
-    // Транспорт создаётся здесь и передаётся виджету. Это единственное место,
-    // которое знает, каким способом ходят сообщения: чтобы перейти на настоящий
-    // сервер, меняется ровно эта строка, а виджет остаётся прежним.
-    current.instance = new ChatWidget({ siteId }, new LocalTransport());
-    log(`виджет готов: siteId=${siteId}, версия ${version}`);
+    // Транспорт создаётся здесь и передаётся виджету. Это единственное место в
+    // виджете, которое знает, каким способом ходят сообщения: заменить опрос на
+    // SSE или на что-то ещё — значит поменять только эту строку.
+    const apiUrl = resolveApiUrl(options.apiUrl);
+    current.instance = new ChatWidget({ siteId }, new HttpTransport({ siteId, apiUrl }));
+    log(`виджет готов: siteId=${siteId}, версия ${version}, API ${apiUrl}`);
   } catch (error) {
     // Виджет — гость на чужой странице: выпускать исключение наружу нельзя,
     // иначе оно всплывёт в чужом коде обработчиком ошибок.

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { STUB_REPLY_PREFIX } from '../stub-api';
 
 /** Отправляет сообщение и сразу закрывает окно, не дожидаясь ответа. */
 async function sendAndClose(page: Page): Promise<void> {
@@ -51,7 +52,7 @@ test.describe('счётчик непрочитанных', () => {
     await input.fill('привет');
     await input.press('Enter');
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble').last()).toContainText(
-      'Здравствуйте',
+      STUB_REPLY_PREFIX,
     );
 
     await expect(page.locator('.ecw-badge')).toBeHidden();

@@ -146,24 +146,45 @@ test.describe('API виджета', () => {
     expect(onSecond.conversationId).not.toBe(fromFirst.conversationId);
   });
 
-  test('сообщение записывается и выбирается по курсору', async ({ request }) => {
+  test('сообщение записывается, а ассистент отвечает', async ({ request }) => {
     const { first } = requireSites();
     const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');
 
-    const sent = await sendMessage(request, session, 'первое сообщение', 'client-1');
+    const sent = await sendMessage(request, session, 'во сколько вы работаете?', 'client-1');
     expect(sent.message.seq).toBeGreaterThan(0);
     expect(sent.duplicate).toBe(false);
-
-    await sendMessage(request, session, 'второе сообщение', 'client-2');
-    const third = await sendMessage(request, session, 'третье сообщение', 'client-3');
+    expect(sent.message.authorKind).toBe('visitor');
 
     const all = await listMessages(request, session, 0);
-    expect(all.messages.length).toBeGreaterThanOrEqual(3);
-    expect(all.lastSeq).toBe(third.message.seq);
+    const authors = all.messages.map((message) => message.authorKind);
+    expect(authors).toContain('visitor');
+    // Ответ ассистента — такое же сообщение в диалоге, с настоящим номером.
+    expect(authors).toContain('ai');
+  });
 
-    // Курсор: всё, что после второго сообщения.
-    const after = await listMessages(request, session, secondSeq(all));
-    expect(after.messages.map((message) => message.body)).toEqual(['третье сообщение']);
+  test('курсор отдаёт только то, что после указанного номера', async ({ request }) => {
+    const { first } = requireSites();
+    const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');
+
+    await sendMessage(request, session, 'первое сообщение', 'курсор-1');
+    await sendMessage(request, session, 'второе сообщение', 'курсор-2');
+    await sendMessage(request, session, 'третье сообщение', 'курсор-3');
+
+    const all = await listMessages(request, session, 0);
+    const ordered = [...all.messages].sort((left, right) => left.seq - right.seq);
+    expect(ordered.length).toBeGreaterThanOrEqual(4);
+    expect(all.lastSeq).toBe(ordered.at(-1)?.seq);
+
+    // Всё, что после второго по счёту сообщения, — ровно остаток списка.
+    const middle = ordered[1]?.seq ?? 0;
+    const rest = await listMessages(request, session, middle);
+    expect(rest.messages.map((message) => message.seq)).toEqual(
+      ordered.slice(2).map((message) => message.seq),
+    );
+
+    // После последнего известного номера нового нет.
+    const nothing = await listMessages(request, session, all.lastSeq);
+    expect(nothing.messages).toEqual([]);
   });
 
   test('повторная отправка не создаёт второе сообщение', async ({ request }) => {
@@ -171,17 +192,18 @@ test.describe('API виджета', () => {
     const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');
 
     const clientId = 'повтор-один-и-тот-же';
-    const before = await listMessages(request, session, 0);
+    const text = 'написано однажды';
 
-    const firstTry = await sendMessage(request, session, 'написано однажды', clientId);
-    const secondTry = await sendMessage(request, session, 'написано однажды', clientId);
+    const firstTry = await sendMessage(request, session, text, clientId);
+    const secondTry = await sendMessage(request, session, text, clientId);
 
     expect(firstTry.duplicate).toBe(false);
     expect(secondTry.duplicate).toBe(true);
     expect(secondTry.message.id).toBe(firstTry.message.id);
 
+    // Главное: в переписке ровно одна копия этого текста, а не две.
     const after = await listMessages(request, session, 0);
-    expect(after.messages.length - before.messages.length).toBe(1);
+    expect(after.messages.filter((message) => message.body === text).length).toBe(1);
   });
 
   test('без токена и с испорченным токеном доступа нет', async ({ request }) => {
@@ -289,12 +311,6 @@ async function listMessages(
   });
   expect(response.status()).toBe(200);
   return (await response.json()) as MessagesResponseBody;
-}
-
-/** Номер предпоследнего сообщения — от него проверяем курсор. */
-function secondSeq(response: MessagesResponseBody): number {
-  const sorted = [...response.messages].sort((left, right) => left.seq - right.seq);
-  return sorted.at(-2)?.seq ?? 0;
 }
 
 /** Разбирает полезную нагрузку токена. Подпись не проверяем — это делает сервер. */

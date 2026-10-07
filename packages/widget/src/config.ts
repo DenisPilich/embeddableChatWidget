@@ -21,5 +21,22 @@ export function readOptionsFromScript(): InitOptions | null {
   const siteId = script.dataset.siteId?.trim();
   if (!siteId) return null;
 
-  return { siteId };
+  const apiUrl = script.dataset.ecwApi?.trim();
+  return apiUrl ? { siteId, apiUrl } : { siteId };
+}
+
+/**
+ * Адрес API: заданный на странице или зашитый при сборке.
+ *
+ * Хвостовые косые черты убираем здесь, а не в каждом запросе: иначе адрес вида
+ * `https://api.example.com/` дал бы `//api/v1/init`, а на такое часть серверов
+ * отвечает ошибкой перенаправления.
+ *
+ * Аргумент принимается как `unknown`, потому что виджет вызывают и из обычного
+ * JavaScript, где типов нет: строка там не гарантирована, а падать на этом
+ * виджет не имеет права.
+ */
+export function resolveApiUrl(value: unknown): string {
+  const fromPage = typeof value === 'string' ? value.trim() : '';
+  return (fromPage || __ECW_API_URL__).replace(/\/+$/, '');
 }

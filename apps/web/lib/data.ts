@@ -101,27 +101,32 @@ export async function listMessages(params: {
 }
 
 /**
- * Записывает сообщение посетителя.
+ * Записывает сообщение в диалог.
  *
  * Две нетривиальные вещи, ради которых функция существует отдельно:
  *
- * 1. **Идемпотентность.** Виджет присылает свой идентификатор сообщения. Если
- *    ответ не дошёл и он повторит отправку, второго сообщения не появится —
- *    вернётся уже записанное.
+ * 1. **Идемпотентность.** Сообщения посетителя приходят со своим идентификатором.
+ *    Если ответ не дошёл и виджет повторит отправку, второго сообщения не
+ *    появится — вернётся уже записанное. К сообщениям ассистента и оператора это
+ *    не относится: повторной отправки у них не бывает, и `clientId` не задаётся.
  *
  * 2. **Номер выдаётся атомарно.** Прочитать `lastSeq`, прибавить единицу и
  *    записать обратно нельзя: два одновременных сообщения получат один номер и
  *    одно из них потеряется. `UPDATE ... RETURNING` делает и то и другое одной
  *    операцией, а заодно проверяет, что диалог принадлежит этому сайту.
  */
-export async function appendVisitorMessage(params: {
+export async function appendMessage(params: {
   siteId: string;
   conversationId: string;
-  clientId: string;
+  author: Message['author'];
   body: string;
+  /** Только для сообщений посетителя: на нём держится защита от повторов. */
+  clientId?: string;
 }): Promise<{ message: Message; duplicate: boolean }> {
-  const existing = await findMessageByClientId(params.conversationId, params.clientId);
-  if (existing) return { message: existing, duplicate: true };
+  if (params.clientId) {
+    const existing = await findMessageByClientId(params.conversationId, params.clientId);
+    if (existing) return { message: existing, duplicate: true };
+  }
 
   const updated = await prisma.$queryRaw<{ lastSeq: number }[]>`
     UPDATE "conversations"
@@ -138,8 +143,8 @@ export async function appendVisitorMessage(params: {
       data: {
         conversationId: params.conversationId,
         seq,
-        author: 'VISITOR',
-        clientId: params.clientId,
+        author: params.author,
+        clientId: params.clientId ?? null,
         body: params.body,
       },
     });
@@ -148,7 +153,7 @@ export async function appendVisitorMessage(params: {
     // Гонка: между проверкой и вставкой то же сообщение успело записаться.
     // Номер при этом сгорит — в нумерации останется пропуск, и это нормально:
     // курсору важна монотонность, а не отсутствие дыр.
-    if (isUniqueViolation(error)) {
+    if (params.clientId && isUniqueViolation(error)) {
       const raced = await findMessageByClientId(params.conversationId, params.clientId);
       if (raced) return { message: raced, duplicate: true };
     }

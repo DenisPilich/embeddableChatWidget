@@ -9,3 +9,10 @@ declare module '*.css?inline' {
   const css: string;
   export default css;
 }
+
+/**
+ * Адрес API по умолчанию. Подставляется сборщиком на этапе сборки (см. `define`
+ * в vite.config.ts): собранный виджет должен знать, куда обращаться, не требуя
+ * от клиента ничего указывать.
+ */
+declare const __ECW_API_URL__: string;

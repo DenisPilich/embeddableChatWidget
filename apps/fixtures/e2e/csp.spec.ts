@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { STUB_REPLY_PREFIX } from '../stub-api';
 
 test.describe('строгая Content Security Policy', () => {
   test.beforeEach(async ({ page }) => {
@@ -38,7 +39,7 @@ test.describe('строгая Content Security Policy', () => {
     await input.press('Enter');
 
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble').last()).toContainText(
-      'Здравствуйте',
+      STUB_REPLY_PREFIX,
     );
   });
 

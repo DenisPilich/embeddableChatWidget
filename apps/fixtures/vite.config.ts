@@ -1,6 +1,13 @@
 import { defineConfig } from 'vite';
+import { stubApi } from './stub-api';
 
 export default defineConfig({
+  plugins: [
+    // Двойник серверной части: виджет обращается к API по-настоящему, а проверки
+    // виджета при этом не зависят от живой базы и секретов. Настоящий сервер
+    // проверяется в api.spec.ts.
+    stubApi(),
+  ],
   server: {
     port: 5173,
     // Если порт занят, лучше упасть с ошибкой, чем молча занять другой:

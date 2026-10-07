@@ -135,3 +135,46 @@ function isStoredMessage(value: unknown): value is StoredMessage {
       candidate.authorKind === 'agent')
   );
 }
+
+/**
+ * Токен посетителя.
+ *
+ * Хранится отдельно от переписки: у них разное время жизни. Переписка — кэш, её
+ * потеря безобидна. Токен — пропуск: без него посетитель получит новый и
+ * окажется в новом диалоге, а прежняя переписка останется висеть у оператора.
+ *
+ * Ключ включает siteId по той же причине, что и у переписки: на одной странице
+ * могут оказаться виджеты двух разных сайтов, и общий ключ их бы перепутал.
+ */
+export function loadToken(siteId: string): string | null {
+  const storage = getStorage();
+  if (!storage) return null;
+
+  try {
+    const raw = storage.getItem(tokenKeyFor(siteId));
+    // Проверяем длину, а не содержимое: подписывать токен будет сервер, а нам
+    // достаточно не тащить в заголовок мусор из хранилища, куда может писать
+    // кто угодно.
+    if (!raw || raw.length > 4000) return null;
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+/** Сохраняет токен. Молча ничего не делает, если хранилище недоступно. */
+export function saveToken(siteId: string, token: string): void {
+  const storage = getStorage();
+  if (!storage) return;
+
+  try {
+    storage.setItem(tokenKeyFor(siteId), token);
+  } catch {
+    // Без хранилища виджет доживёт до перезагрузки страницы: токен останется в
+    // памяти. Хуже, но не смертельно.
+  }
+}
+
+function tokenKeyFor(siteId: string): string {
+  return `ecw:${siteId}:token:v${FORMAT_VERSION}`;
+}

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { STUB_REPLY_PREFIX } from '../stub-api';
 import { HOST } from './helpers';
 
 test.describe('враждебная вёрстка', () => {
@@ -17,7 +18,7 @@ test.describe('враждебная вёрстка', () => {
     await input.press('Enter');
 
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble').last()).toContainText(
-      'Здравствуйте',
+      STUB_REPLY_PREFIX,
     );
   });
 
