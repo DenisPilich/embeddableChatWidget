@@ -18,6 +18,18 @@ import {
 test.describe('API виджета', () => {
   test.skip(!readSeed(), 'нет данных наполнения: pnpm --filter @ecw/web db:seed');
 
+  test('диагностика показывает, кто отвечает посетителям', async ({ request }) => {
+    const response = await request.get(`${apiBase}/api/health/ai`);
+    expect(response.status()).toBe(200);
+
+    const body = (await response.json()) as { provider: string; ready: boolean };
+    // Проверки всегда идут на заготовках: набор с живой моделью стал бы платным,
+    // медленным и зависимым от чужого сервиса. Настоящая модель проверяется
+    // отдельно, в ai.spec.ts, и только когда ключ задан.
+    expect(body.provider).toBe('canned');
+    expect(body.ready).toBe(false);
+  });
+
   test('предварительный запрос браузера разрешает источник', async ({ request }) => {
     const { first } = requireSites();
 

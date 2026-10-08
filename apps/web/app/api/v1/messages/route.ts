@@ -3,8 +3,13 @@ import type { Message } from '@prisma/client';
 import type { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { authenticateWidget } from '@/lib/auth';
-import { generateReply } from '@/lib/assistant';
-import { ConversationNotFoundError, appendMessage, listMessages } from '@/lib/data';
+import { HISTORY_TURNS, answerQuestion, toChatTurns } from '@/lib/assistant';
+import {
+  ConversationNotFoundError,
+  appendMessage,
+  listMessages,
+  listRecentMessages,
+} from '@/lib/data';
 import {
   errorResponse,
   jsonResponse,
@@ -84,6 +89,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!body) return errorResponse('empty_message', 400, origin);
 
   try {
+    // Историю забираем ДО записи вопроса. Иначе он попал бы в переписку дважды:
+    // один раз как последняя реплика истории, второй — как сам вопрос.
+    const previous = await listRecentMessages({
+      siteId: claims.siteId,
+      conversationId: claims.conversationId,
+      limit: HISTORY_TURNS,
+    });
+
     const { message, duplicate } = await appendMessage({
       siteId: claims.siteId,
       conversationId: claims.conversationId,
@@ -92,23 +105,25 @@ export async function POST(request: Request): Promise<NextResponse> {
       body,
     });
 
-    // Ответ ассистента. Повторную отправку пропускаем: ответ на неё уже есть,
-    // иначе каждый повтор порождал бы новую реплику.
+    // Ответ на повторную отправку не генерируем: он уже есть, и каждый повтор
+    // порождал бы новую реплику.
     //
-    // Ошибка ассистента не должна ломать отправку: сообщение посетителя уже
-    // записано, и оператор увидит вопрос — пусть и без ответа.
+    // `answerQuestion` не бросает исключение — посетитель получит ответ в любом
+    // случае: от модели, про исчерпанный бюджет или про недоступность. Поэтому
+    // здесь нет обработки ошибок модели: она живёт внутри.
     if (!duplicate) {
-      try {
-        const answer = await generateReply(body);
-        await appendMessage({
-          siteId: claims.siteId,
-          conversationId: claims.conversationId,
-          author: 'AI',
-          body: answer,
-        });
-      } catch (error) {
-        console.error('[ecw] не удалось получить ответ ассистента', error);
-      }
+      const outcome = await answerQuestion({
+        siteId: claims.siteId,
+        question: body,
+        history: toChatTurns(previous),
+      });
+
+      await appendMessage({
+        siteId: claims.siteId,
+        conversationId: claims.conversationId,
+        author: 'AI',
+        body: outcome.text,
+      });
     }
 
     const response: SendMessageResponse = { message: toWireMessage(message), duplicate };

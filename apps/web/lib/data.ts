@@ -185,3 +185,78 @@ function isUniqueViolation(error: unknown): boolean {
     (error as { code?: unknown }).code === 'P2002'
   );
 }
+
+/** Настройки ассистента, как их видит код. Без служебных полей таблицы. */
+export interface AiSettings {
+  systemPrompt: string;
+  model: string;
+  temperature: number;
+  dailyTokenBudget: number;
+}
+
+/** Настройки ассистента для сайта или `null`, если их ещё не заводили. */
+export async function findAiSettings(siteId: string): Promise<AiSettings | null> {
+  const config = await prisma.aiConfig.findUnique({ where: { siteId } });
+  if (!config) return null;
+
+  return {
+    systemPrompt: config.systemPrompt,
+    model: config.model,
+    temperature: config.temperature,
+    dailyTokenBudget: config.dailyTokenBudget,
+  };
+}
+
+/**
+ * Последние сообщения диалога — в том порядке, в каком их читает модель.
+ *
+ * Забираем с конца, потому что «последние N» — это про конец переписки, а
+ * отдаём по возрастанию: разговор, переданный модели задом наперёд, она
+ * поймёт неправильно.
+ */
+export async function listRecentMessages(params: {
+  siteId: string;
+  conversationId: string;
+  limit: number;
+}): Promise<Message[]> {
+  const recent = await prisma.message.findMany({
+    where: {
+      conversationId: params.conversationId,
+      conversation: { siteId: params.siteId },
+    },
+    orderBy: { seq: 'desc' },
+    take: params.limit,
+  });
+
+  return recent.reverse();
+}
+
+/**
+ * Сколько токенов сайт израсходовал сегодня.
+ *
+ * Сутки считаются по UTC. Для клиента из другого пояса граница придётся не на
+ * полночь, и это осознанное упрощение: часовой пояс сайта в модели данных не
+ * хранится, а придумывать его на этом шаге рано.
+ */
+export async function tokensUsedToday(siteId: string): Promise<number> {
+  const usage = await prisma.tokenUsage.findUnique({
+    where: { siteId_day: { siteId, day: startOfUtcDay() } },
+  });
+  return usage?.tokens ?? 0;
+}
+
+/** Записывает расход. Сложение делает база, а не код: два запроса не потеряются. */
+export async function recordTokenUsage(siteId: string, tokens: number): Promise<void> {
+  const day = startOfUtcDay();
+
+  await prisma.tokenUsage.upsert({
+    where: { siteId_day: { siteId, day } },
+    update: { tokens: { increment: tokens } },
+    create: { siteId, day, tokens },
+  });
+}
+
+function startOfUtcDay(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}

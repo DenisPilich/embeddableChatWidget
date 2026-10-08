@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
+import { DEFAULT_MODEL } from '../lib/ai/provider';
 import { prisma } from '../lib/prisma';
 
 /**
@@ -90,12 +91,15 @@ async function main(): Promise<void> {
 
     await prisma.aiConfig.upsert({
       where: { siteId: site.id },
-      update: {},
+      // Имя модели обновляем при каждом запуске: наполнение — источник правды
+      // для данных разработки, а имя демонстрационной модели здесь было бы
+      // нерабочим и падало бы только на живом обращении к провайдеру.
+      update: { model: DEFAULT_MODEL },
       create: {
         siteId: site.id,
         systemPrompt:
           'You are the assistant of the "Little Cloud" coffee shop. Answer briefly and do not invent facts that are not on the site.',
-        model: 'demo-assistant',
+        model: DEFAULT_MODEL,
         temperature: 0.3,
         dailyTokenBudget: 50_000,
       },
