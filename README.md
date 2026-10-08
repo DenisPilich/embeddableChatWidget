@@ -83,7 +83,7 @@ The stands are covered by Playwright tests (`apps/fixtures/e2e`). They check tha
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.1.0/dist/ecw-loader.iife.js"
+  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.1.2/dist/ecw-loader.iife.js"
   data-site-id="site_123"
   async
 ></script>
@@ -99,7 +99,7 @@ By default the widget calls the address baked in at build time. Self-hosters can
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.1.0/dist/ecw-loader.iife.js"
+  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.1.2/dist/ecw-loader.iife.js"
   data-site-id="site_123"
   data-ecw-api="https://chat.example.com"
   async
@@ -115,7 +115,7 @@ The loader copies **every** `data-` attribute onto the main file, so a new widge
 
 ## Publishing
 
-The package is published: **`ecw-widget@0.1.0`**. The live URL is verified by a test — the widget really does boot from the CDN, rather than merely building locally.
+The package is published: **`ecw-widget@0.1.2`**. The live URL is verified by a test — the widget really does boot from the CDN, rather than merely building locally.
 
 **npm requires two-factor authentication to publish.** Without it the registry answers `403` with a message about 2FA and no hint that the problem is the account rather than the package. There are two workable paths:
 
@@ -137,8 +137,20 @@ Releasing the next version:
 
 ```powershell
 cd packages\widget
-npm.cmd version patch
+npm.cmd version patch --no-git-tag-version
 npm.cmd publish
+```
+
+Three details of this flow are the result of getting them wrong once:
+
+- **`--no-git-tag-version`.** By default npm commits and tags the bump itself. On Windows it gives up on this repository — git cannot walk some deeply nested paths inside `node_modules` — and leaves the version changed but uncommitted, which then makes the next command fail with "Git working directory not clean". Bumping without git and committing by hand is boring and predictable.
+- **The build runs by itself** (`prepublishOnly` in `package.json`). Before that was added, `npm publish` shipped whatever happened to be in `dist/`: version `0.1.1` went out containing a bundle that reported `0.1.0`. The CDN test checks that the version the widget reports matches the version in the URL, and it caught exactly this.
+- **npm asks for a one-time code** from your authenticator app. Type it at the prompt, or pass `--otp=123456` — which is what a program running the command instead of a person needs.
+
+A published version cannot be replaced. If a build turns out to be broken, publish the next patch and mark the bad one:
+
+```powershell
+npm.cmd deprecate ecw-widget@0.1.1 "Wrong build: the bundle reports version 0.1.0 in window.ECW.version. Use 0.1.2."
 ```
 
 **The version in the URL is mandatory.** Without it, the next release would silently change the widget on every site it is already embedded in.
@@ -146,7 +158,7 @@ npm.cmd publish
 Check that customers will get a working URL:
 
 ```powershell
-$env:ECW_CDN_URL = 'https://cdn.jsdelivr.net/npm/ecw-widget@0.1.0/dist/ecw-loader.iife.js'
+$env:ECW_CDN_URL = 'https://cdn.jsdelivr.net/npm/ecw-widget@0.1.2/dist/ecw-loader.iife.js'
 pnpm.cmd --filter @ecw/fixtures test:e2e cdn
 ```
 
