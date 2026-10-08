@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { buildBody, createGroqProvider } from '../../web/lib/ai/groq';
-import { DEFAULT_MODEL } from '../../web/lib/ai/provider';
+import { activeEndpoint, activeModel, providerName } from '../../web/lib/ai';
+import { buildBody, createChatCompletionsProvider } from '../../web/lib/ai/chat-completions';
 
 /**
  * Проверки слоя модели.
@@ -14,8 +14,8 @@ import { DEFAULT_MODEL } from '../../web/lib/ai/provider';
  * становиться платным, медленным и зависимым от чужого сервиса — иначе упавшая
  * у провайдера модель красила бы тесты, к ней не относящиеся.
  *
- * Ключ читается прямо из `apps/web/.env`, где он и живёт. В окружение тестов он
- * намеренно не попадает.
+ * Настройки читаются прямо из `apps/web/.env`, где они и живут. В окружение
+ * тестов ключ намеренно не попадает.
  */
 
 const REQUEST = {
@@ -30,15 +30,22 @@ const REQUEST = {
   maxTokens: 100,
 };
 
-function readApiKey(): string | null {
+function readEnvFile(): string | null {
   try {
-    const env = readFileSync(new URL('../../web/.env', import.meta.url), 'utf8');
-    const match = /^\s*GROQ_API_KEY\s*=\s*"?([^"\r\n]+)"?/m.exec(env);
-    const value = match?.[1]?.trim();
-    return value ? value : null;
+    return readFileSync(new URL('../../web/.env', import.meta.url), 'utf8');
   } catch {
     return null;
   }
+}
+
+/** Ключ выбранного сервиса. Оба имени переменной, как и в самом приложении. */
+function readApiKey(): string | null {
+  const env = readEnvFile();
+  if (!env) return null;
+
+  const match = /^\s*(?:ECW_AI_KEY|GROQ_API_KEY)\s*=\s*"?([^"\r\n]+)"?/m.exec(env);
+  const value = match?.[1]?.trim();
+  return value ? value : null;
 }
 
 test.describe('слой модели', () => {
@@ -56,9 +63,11 @@ test.describe('слой модели', () => {
     ]);
   });
 
-  test('ответ провайдера с ошибкой приводит к исключению', async () => {
-    const provider = createGroqProvider({
+  test('ответ сервиса с ошибкой приводит к исключению', async () => {
+    const provider = createChatCompletionsProvider({
+      name: 'test',
       apiKey: 'нет-такого-ключа',
+      endpoint: 'https://example.invalid/chat/completions',
       fetchImpl: () =>
         Promise.resolve(
           new Response('invalid api key', { status: 401, statusText: 'Unauthorized' }),
@@ -71,8 +80,10 @@ test.describe('слой модели', () => {
   });
 
   test('пустой ответ считается ошибкой, а не пустым сообщением в чате', async () => {
-    const provider = createGroqProvider({
+    const provider = createChatCompletionsProvider({
+      name: 'test',
       apiKey: 'ключ',
+      endpoint: 'https://example.invalid/chat/completions',
       fetchImpl: () =>
         Promise.resolve(
           new Response(JSON.stringify({ choices: [] }), {
@@ -86,25 +97,35 @@ test.describe('слой модели', () => {
   });
 
   test.describe('живая модель', () => {
-    test.skip(!readApiKey(), 'нет GROQ_API_KEY в apps/web/.env');
+    test.skip(!readApiKey(), 'нет ключа модели в apps/web/.env');
+
     // Один настоящий запрос: он стоит доли копейки и проверяет то, что макетом
-    // не проверить — что ключ рабочий, а имя модели существует.
-    test('ключ и модель по умолчанию рабочие', async () => {
-      const provider = createGroqProvider({ apiKey: readApiKey() ?? '' });
+    // не проверить — что ключ рабочий, адрес верный, а имя модели существует.
+    test('ключ, адрес и модель по умолчанию рабочие', async () => {
+      const provider = createChatCompletionsProvider({
+        name: providerName(),
+        apiKey: readApiKey() ?? '',
+        endpoint: activeEndpoint(),
+      });
 
       const result = await provider.answer({
         ...REQUEST,
         question: 'Reply with the single word: ready',
         systemPrompt: 'Answer with one word only.',
         history: [],
-        model: DEFAULT_MODEL,
+        model: activeModel(),
         temperature: 0,
         maxTokens: 20,
       });
 
       expect(result.text.length).toBeGreaterThan(0);
-      expect(result.inputTokens).toBeGreaterThan(0);
-      expect(result.outputTokens).toBeGreaterThan(0);
+
+      // Расход считают все крупные сервисы, но локальная модель может его не
+      // сообщать — для неё это не ошибка.
+      if (providerName() !== 'custom') {
+        expect(result.inputTokens).toBeGreaterThan(0);
+        expect(result.outputTokens).toBeGreaterThan(0);
+      }
     });
   });
 });

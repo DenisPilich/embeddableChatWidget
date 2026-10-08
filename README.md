@@ -113,6 +113,43 @@ pnpm build
 
 The loader copies **every** `data-` attribute onto the main file, so a new widget option never requires touching the loader. It once copied only `data-site-id`, and the new option silently never reached the widget — an automated test now guards this.
 
+## Which model answers
+
+Without a key the assistant answers from canned replies and everything else works: you can install the project, run it and click through the demo without creating a single account. `/api/health/ai` always reports who is answering right now.
+
+Any service that speaks the OpenAI chat-completions dialect works, because that is the only thing the provider layer assumes. Switching services is configuration, not code:
+
+```env
+ECW_AI_PROVIDER="gemini"     # groq | gemini | custom | canned
+ECW_AI_KEY="..."
+ECW_AI_MODEL=""              # empty means the service default
+```
+
+| Service | Where to get a key |
+|---|---|
+| `groq` | <https://console.groq.com/keys> |
+| `gemini` | <https://aistudio.google.com/apikey> |
+| `custom` | any address in `ECW_AI_ENDPOINT`, including a model on your own machine |
+
+A model running locally needs no account at all:
+
+```env
+ECW_AI_PROVIDER="custom"
+ECW_AI_ENDPOINT="http://localhost:11434/v1/chat/completions"
+ECW_AI_KEY="ollama"
+ECW_AI_MODEL="qwen2.5:3b"
+```
+
+This flexibility is not decoration. While building the project, Groq's signup flow refused to let the author create an account at all; because the provider sits behind an interface, the fix was a two-line change of settings rather than a rewrite.
+
+Daily spend is capped per site (`dailyTokenBudget`) and recorded in the database. When the cap is reached the assistant says so, and the message stays in the conversation for a human. Model keys and prompts are never sent to the browser.
+
+Check that a key, an address and a model name actually work — one real request, a fraction of a cent:
+
+```powershell
+pnpm.cmd --filter @ecw/fixtures test:e2e ai
+```
+
 ## Publishing
 
 The package is published: **`ecw-widget@0.1.2`**. The live URL is verified by a test — the widget really does boot from the CDN, rather than merely building locally.

@@ -1,19 +1,20 @@
 import type { AnswerProvider, AnswerRequest, AnswerResult } from './provider';
 
 /**
- * Провайдер на Groq.
+ * Провайдер, говорящий на языке chat completions.
  *
- * Запрос идёт обычным `fetch` по адресу, совместимому с OpenAI, — без
- * библиотеки-обёртки. Пакет SDK добавил бы зависимость и слой абстракции над
- * одним HTTP-запросом; здесь же всё видно целиком, включая то, что уходит
- * наружу.
+ * Запрос идёт обычным `fetch` — без библиотеки-обёртки. Пакет SDK добавил бы
+ * зависимость и слой абстракции над одним HTTP-запросом; здесь же всё видно
+ * целиком, включая то, что уходит наружу.
+ *
+ * Один и тот же код обслуживает и Groq, и Gemini, и модель на своём компьютере:
+ * различаются только адрес и ключ. Это и есть смысл того, что провайдер спрятан
+ * за интерфейсом.
  *
  * Транспорт подменяем (`fetchImpl`): так сборку запроса и разбор ответа можно
- * проверять без сети и без ключа. Это не украшение — иначе единственным
- * способом узнать, что мы правильно формируем запрос, была бы живая модель.
+ * проверять без сети и без ключа. Это не украшение — иначе единственным способом
+ * узнать, что мы правильно формируем запрос, была бы живая модель.
  */
-
-const ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
 
 /** Сколько ждать ответа, прежде чем считать попытку потерянной. */
 const TIMEOUT_MS = 30_000;
@@ -21,24 +22,26 @@ const TIMEOUT_MS = 30_000;
 /** Сколько символов ответа провайдера писать в журнал при ошибке. */
 const ERROR_DETAIL_LIMIT = 500;
 
-interface GroqOptions {
+export interface ChatCompletionsOptions {
+  /** Имя для журнала: groq, gemini, свой сервер. */
+  name: string;
   apiKey: string;
+  /** Полный адрес точки chat/completions. */
+  endpoint: string;
   /** Подменяемый транспорт для проверок. */
   fetchImpl?: typeof fetch;
-  endpoint?: string;
 }
 
-interface GroqResponse {
+interface CompletionResponse {
   choices?: { message?: { content?: string } }[];
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
-export function createGroqProvider(options: GroqOptions): AnswerProvider {
+export function createChatCompletionsProvider(options: ChatCompletionsOptions): AnswerProvider {
   const doFetch = options.fetchImpl ?? fetch;
-  const endpoint = options.endpoint ?? ENDPOINT;
 
   return {
-    name: 'groq',
+    name: options.name,
 
     async answer(request: AnswerRequest): Promise<AnswerResult> {
       const controller = new AbortController();
@@ -47,7 +50,7 @@ export function createGroqProvider(options: GroqOptions): AnswerProvider {
       }, TIMEOUT_MS);
 
       try {
-        const response = await doFetch(endpoint, {
+        const response = await doFetch(options.endpoint, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${options.apiKey}`,
@@ -62,13 +65,13 @@ export function createGroqProvider(options: GroqOptions): AnswerProvider {
           // провайдера может лежать кусок нашего запроса, то есть системный
           // промпт клиента. Наружу его отдавать нельзя.
           const detail = await readErrorDetail(response);
-          throw new Error(`провайдер ответил ${String(response.status)}: ${detail}`);
+          throw new Error(`${options.name} ответил ${String(response.status)}: ${detail}`);
         }
 
-        const payload = (await response.json()) as GroqResponse;
+        const payload = (await response.json()) as CompletionResponse;
         const text = payload.choices?.[0]?.message?.content?.trim();
         if (!text) {
-          throw new Error('провайдер вернул пустой ответ');
+          throw new Error(`${options.name} вернул пустой ответ`);
         }
 
         return {

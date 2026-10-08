@@ -1,5 +1,5 @@
 import type { Message } from '@prisma/client';
-import { DEFAULT_MODEL, resolveProvider, type ChatTurn } from './ai';
+import { activeModel, resolveProvider, type ChatTurn } from './ai';
 import { findAiSettings, recordTokenUsage, tokensUsedToday, type AiSettings } from './data';
 
 /**
@@ -30,7 +30,7 @@ const UNAVAILABLE =
 const DEFAULT_SETTINGS: AiSettings = {
   systemPrompt:
     'You are a helpful assistant on a company website. Answer briefly and only from what you know about the company. If you do not know something, say so instead of guessing.',
-  model: DEFAULT_MODEL,
+  model: activeModel(),
   temperature: 0.3,
   dailyTokenBudget: 50_000,
 };
