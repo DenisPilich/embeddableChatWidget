@@ -135,7 +135,9 @@ test.describe('слой модели', () => {
         history: [],
         model: activeModel(),
         temperature: 0,
-        maxTokens: 20,
+        // Не двадцать: модели, которые «думают», тратят часть предела на
+        // размышление, и при тесном пределе ответ приходит пустым.
+        maxTokens: 128,
       });
 
       expect(result.text.length).toBeGreaterThan(0);

@@ -111,7 +111,10 @@ export async function verifyProvider(): Promise<ProviderCheck> {
       history: [],
       model: activeModel(),
       temperature: 0,
-      maxTokens: 8,
+      // Не восемь: модели, которые перед ответом «думают», тратят часть предела
+      // на размышление, и при тесном пределе ответ приходит пустым. Проверка,
+      // которая врёт из-за собственной жадности, хуже отсутствия проверки.
+      maxTokens: 128,
     });
     return { ok: true };
   } catch (error) {

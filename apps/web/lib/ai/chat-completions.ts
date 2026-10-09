@@ -38,7 +38,7 @@ export interface ChatCompletionsOptions {
 }
 
 interface CompletionResponse {
-  choices?: { message?: { content?: string } }[];
+  choices?: { message?: { content?: string }; finish_reason?: string }[];
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
@@ -77,8 +77,18 @@ export function createChatCompletionsProvider(options: ChatCompletionsOptions): 
         }
 
         const payload = (await response.json()) as CompletionResponse;
-        const text = payload.choices?.[0]?.message?.content?.trim();
+        const choice = payload.choices?.[0];
+        const text = choice?.message?.content?.trim();
         if (!text) {
+          // Пустой ответ бывает не поломкой, а следствием тесного предела длины.
+          // Модели, которые «думают» перед ответом, тратят часть предела на
+          // размышление, и на сам ответ ничего не остаётся. Разница
+          // принципиальная: одно чинится числом, другое — нет.
+          if (choice?.finish_reason === 'length') {
+            throw new ProviderError(
+              `${options.name}: ответ не поместился в предел длины — увеличьте max_tokens`,
+            );
+          }
           throw new ProviderError(`${options.name} вернул пустой ответ`);
         }
 

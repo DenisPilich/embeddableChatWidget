@@ -17,8 +17,14 @@ import { findAiSettings, recordTokenUsage, tokensUsedToday, type AiSettings } fr
 /** Сколько последних реплик отдаём модели. */
 const HISTORY_LIMIT = 10;
 
-/** Предел длины ответа: простата в чате не нужна, да и расход конечен. */
-const MAX_ANSWER_TOKENS = 400;
+/**
+ * Предел длины ответа.
+ *
+ * Восемьсот, а не четыреста: модели, которые перед ответом «думают», тратят
+ * часть предела на размышление, и при тесном пределе ответ приходит пустым.
+ * Проверено на живом Gemini — при двадцати токенах он не сказал ничего.
+ */
+const MAX_ANSWER_TOKENS = 800;
 
 const BUDGET_EXHAUSTED =
   'The assistant has reached its daily limit. Your message is saved and a human will reply.';

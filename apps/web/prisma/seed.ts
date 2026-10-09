@@ -21,6 +21,24 @@ import { prisma } from '../lib/prisma';
 const WORKSPACE_ID = 'ws_local_demo';
 const OWNER_EMAIL = 'demo@example.com';
 
+/**
+ * Системный промпт демонстрационного сайта.
+ *
+ * Факты перечислены прямо здесь, потому что другого источника знаний у модели
+ * нет: виджет не отдаёт ей содержимое страницы. В рабочем варианте этот текст
+ * пишет владелец сайта — ровно поэтому он и хранится в настройках сайта, а не в
+ * коде.
+ */
+const SYSTEM_PROMPT = [
+  'You are the assistant of "Little Cloud Coffee", a small coffee shop.',
+  'Opening hours: Monday to Friday 8:00-21:00, Saturday 9:00-22:00, Sunday 9:00-19:00.',
+  'Address: Vinogradnaya 14, the entrance is from the courtyard.',
+  'We roast our own beans, every Tuesday.',
+  'Answer briefly, in the language the visitor wrote in.',
+  'If something is not in this list, say you do not know and offer to pass the question to a human.',
+  'Never invent prices, dishes or facts that are not listed here.',
+].join(' ');
+
 /** Файл с ключами для автотестов. В репозиторий не попадает — он в .gitignore. */
 const SEED_FILE = new URL('../.seed-sites.json', import.meta.url);
 
@@ -91,14 +109,13 @@ async function main(): Promise<void> {
 
     await prisma.aiConfig.upsert({
       where: { siteId: site.id },
-      // Имя модели обновляем при каждом запуске: наполнение — источник правды
-      // для данных разработки, а имя демонстрационной модели здесь было бы
-      // нерабочим и падало бы только на живом обращении к провайдеру.
-      update: { model: activeModel() },
+      // Промпт и имя модели обновляем при каждом запуске: наполнение — источник
+      // правды для данных разработки, а демонстрационное имя модели здесь уже
+      // оказывалось нерабочим и падало только на живом обращении.
+      update: { model: activeModel(), systemPrompt: SYSTEM_PROMPT },
       create: {
         siteId: site.id,
-        systemPrompt:
-          'You are the assistant of the "Little Cloud" coffee shop. Answer briefly and do not invent facts that are not on the site.',
+        systemPrompt: SYSTEM_PROMPT,
         model: activeModel(),
         temperature: 0.3,
         dailyTokenBudget: 50_000,
