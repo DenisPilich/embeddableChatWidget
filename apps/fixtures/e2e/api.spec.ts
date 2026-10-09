@@ -18,16 +18,30 @@ import {
 test.describe('API виджета', () => {
   test.skip(!readSeed(), 'нет данных наполнения: pnpm --filter @ecw/web db:seed');
 
-  test('диагностика показывает, кто отвечает посетителям', async ({ request }) => {
-    const response = await request.get(`${apiBase}/api/health/ai`);
-    expect(response.status()).toBe(200);
+  test('диагностика различает «настроено» и «работает»', async ({ request }) => {
+    const configuration = await request.get(`${apiBase}/api/health/ai`);
+    expect(configuration.status()).toBe(200);
 
-    const body = (await response.json()) as { provider: string; ready: boolean };
+    const info = (await configuration.json()) as {
+      provider: string;
+      configured: boolean;
+      hint?: string;
+    };
     // Проверки всегда идут на заготовках: набор с живой моделью стал бы платным,
     // медленным и зависимым от чужого сервиса. Настоящая модель проверяется
     // отдельно, в ai.spec.ts, и только когда ключ задан.
-    expect(body.provider).toBe('canned');
-    expect(body.ready).toBe(false);
+    expect(info.provider).toBe('canned');
+    expect(info.configured).toBe(false);
+    // Обычный ответ обязан честно говорить, что ничего не проверял: однажды
+    // поле с именем `ready` означало лишь «ключ непустой» и ввело в заблуждение.
+    expect(info.hint).toContain('check=1');
+
+    // Явная просьба проверить — единственный способ узнать, работает ли сервис.
+    const checked = await request.get(`${apiBase}/api/health/ai?check=1`);
+    expect(checked.status()).toBe(200);
+
+    const result = (await checked.json()) as { check?: { ok: boolean } };
+    expect(typeof result.check?.ok).toBe('boolean');
   });
 
   test('предварительный запрос браузера разрешает источник', async ({ request }) => {

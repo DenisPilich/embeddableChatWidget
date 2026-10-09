@@ -1,6 +1,6 @@
 import { createCannedProvider } from './canned';
 import { createChatCompletionsProvider } from './chat-completions';
-import { PRESETS, type AnswerProvider, type PresetName } from './provider';
+import { PRESETS, ProviderError, type AnswerProvider, type PresetName } from './provider';
 
 export type { AnswerProvider, AnswerRequest, AnswerResult, ChatTurn } from './provider';
 export { PRESETS } from './provider';
@@ -62,7 +62,15 @@ export interface ProviderInfo {
   provider: string;
   model: string;
   endpoint: string;
-  ready: boolean;
+  /**
+   * Настроен ли сервис — то есть выбран не `canned` и ключ непустой.
+   *
+   * **Это не значит, что ключ рабочий.** Проверить его можно только настоящим
+   * обращением к модели: `verifyProvider()`. Поле названо `configured`, а не
+   * `ready`, именно поэтому: однажды `ready: true` при негодном ключе уже
+   * ввело в заблуждение.
+   */
+  configured: boolean;
 }
 
 export function providerInfo(): ProviderInfo {
@@ -71,8 +79,60 @@ export function providerInfo(): ProviderInfo {
     provider,
     model: activeModel(),
     endpoint: activeEndpoint(),
-    ready: provider !== 'canned' && readKey() !== '',
+    configured: provider !== 'canned' && readKey() !== '',
   };
+}
+
+/** Итог настоящей проверки: один минимальный запрос к модели. */
+export interface ProviderCheck {
+  ok: boolean;
+  /** Что чинить, если не прошло. Человеческим языком. */
+  reason?: string;
+  /** Код ответа сервиса, если он был. */
+  status?: number;
+}
+
+/**
+ * Проверяет сервис настоящим запросом.
+ *
+ * Одного вопроса в несколько токенов достаточно, чтобы отличить рабочий ключ от
+ * нерабочего. Стоит доли копейки, поэтому вызывается по явной просьбе
+ * (`?check=1`), а не при каждом обращении к диагностике.
+ *
+ * Текст ответа сервиса наружу не отдаётся: отдаём код и объяснение, что он
+ * значит. Подробность остаётся в журнале.
+ */
+export async function verifyProvider(): Promise<ProviderCheck> {
+  try {
+    const provider = resolveProvider();
+    await provider.answer({
+      question: 'Reply with the single word: ready',
+      systemPrompt: 'Answer with one word only.',
+      history: [],
+      model: activeModel(),
+      temperature: 0,
+      maxTokens: 8,
+    });
+    return { ok: true };
+  } catch (error) {
+    const status = error instanceof ProviderError ? error.status : null;
+    console.error('[ecw] проверка сервиса модели не прошла', error);
+
+    return {
+      ok: false,
+      ...(status === null ? {} : { status }),
+      reason: explain(status, error),
+    };
+  }
+}
+
+function explain(status: number | null, error: unknown): string {
+  if (status === 401 || status === 403) return 'сервис отклонил ключ';
+  if (status === 404) return 'сервис не знает такую модель или адрес';
+  if (status === 429) return 'упёрлись в ограничение скорости запросов';
+  if (status !== null && status >= 500) return 'сервис модели недоступен';
+  if (error instanceof Error && error.name === 'AbortError') return 'сервис не ответил вовремя';
+  return 'не удалось получить ответ от сервиса';
 }
 
 export function resolveProvider(): AnswerProvider {

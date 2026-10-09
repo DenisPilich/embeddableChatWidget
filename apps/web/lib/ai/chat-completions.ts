@@ -1,4 +1,9 @@
-import type { AnswerProvider, AnswerRequest, AnswerResult } from './provider';
+import {
+  ProviderError,
+  type AnswerProvider,
+  type AnswerRequest,
+  type AnswerResult,
+} from './provider';
 
 /**
  * Провайдер, говорящий на языке chat completions.
@@ -65,13 +70,16 @@ export function createChatCompletionsProvider(options: ChatCompletionsOptions): 
           // провайдера может лежать кусок нашего запроса, то есть системный
           // промпт клиента. Наружу его отдавать нельзя.
           const detail = await readErrorDetail(response);
-          throw new Error(`${options.name} ответил ${String(response.status)}: ${detail}`);
+          throw new ProviderError(
+            `${options.name} ответил ${String(response.status)}: ${detail}`,
+            response.status,
+          );
         }
 
         const payload = (await response.json()) as CompletionResponse;
         const text = payload.choices?.[0]?.message?.content?.trim();
         if (!text) {
-          throw new Error(`${options.name} вернул пустой ответ`);
+          throw new ProviderError(`${options.name} вернул пустой ответ`);
         }
 
         return {

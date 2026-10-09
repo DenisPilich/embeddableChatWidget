@@ -38,14 +38,34 @@ function readEnvFile(): string | null {
   }
 }
 
+/**
+ * Переносит настройки из `apps/web/.env` в окружение теста.
+ *
+ * Функции слоя модели читают окружение **в момент вызова**, а не при импорте,
+ * поэтому такой порядок работает и не требует дублировать правила выбора
+ * сервиса. Без этого шага тест проверял бы не тот сервис, который настроен:
+ * скрипт сервера видит файл, а процесс тестов — нет.
+ */
+function loadEnvFile(): void {
+  const text = readEnvFile();
+  if (!text) return;
+
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^\s*([A-Z0-9_]+)\s*=\s*(.*)$/.exec(line);
+    if (!match) continue;
+
+    const name = match[1];
+    if (!name) continue;
+    process.env[name] = (match[2] ?? '').trim().replace(/^"|"$/g, '');
+  }
+}
+
+loadEnvFile();
+
 /** Ключ выбранного сервиса. Оба имени переменной, как и в самом приложении. */
 function readApiKey(): string | null {
-  const env = readEnvFile();
-  if (!env) return null;
-
-  const match = /^\s*(?:ECW_AI_KEY|GROQ_API_KEY)\s*=\s*"?([^"\r\n]+)"?/m.exec(env);
-  const value = match?.[1]?.trim();
-  return value ? value : null;
+  const key = (process.env.ECW_AI_KEY ?? '').trim() || (process.env.GROQ_API_KEY ?? '').trim();
+  return key === '' ? null : key;
 }
 
 test.describe('слой модели', () => {
