@@ -115,7 +115,7 @@ The loader copies **every** `data-` attribute onto the main file, so a new widge
 
 ## Which model answers
 
-Without a key the assistant answers from canned replies and everything else works: you can install the project, run it and click through the demo without creating a single account. `/api/health/ai` always reports who is answering right now.
+Without a key the assistant answers from canned replies and everything else works: you can install the project, run it and click through the demo without creating a single account. `/api/health/ai` reports the current configuration, and `/api/health/ai?check=1` makes one real request to prove the key actually works — the plain endpoint deliberately does not pretend to have checked it.
 
 Any service that speaks the OpenAI chat-completions dialect works, because that is the only thing the provider layer assumes. Switching services is configuration, not code:
 
