@@ -10,6 +10,10 @@ import type { AnswerProvider, AnswerRequest, AnswerResult } from './provider';
  *
  * Токенов этот провайдер не тратит, поэтому дневной бюджет в режиме заготовок
  * не расходуется — и это правильно: расходовать нечего.
+ *
+ * Текст отдаётся по словам, а не целиком. Так проверки видят ту же картину,
+ * что и с настоящей моделью: куски приходят по мере появления, интерфейс
+ * успевает показать их раньше окончания ответа.
  */
 
 interface ReplyRule {
@@ -52,11 +56,20 @@ export function createCannedProvider(): AnswerProvider {
     name: 'canned',
     answer(request: AnswerRequest): Promise<AnswerResult> {
       const rule = RULES.find((candidate) => candidate.match.test(request.question));
-      return Promise.resolve({
-        text: rule?.answer ?? FALLBACK,
-        inputTokens: 0,
-        outputTokens: 0,
-      });
+      const text = rule?.answer ?? FALLBACK;
+
+      deliver(text, request.onDelta);
+
+      return Promise.resolve({ text, inputTokens: 0, outputTokens: 0 });
     },
   };
+}
+
+/** Отдаёт текст по словам, сохраняя пробелы между ними. */
+function deliver(text: string, onDelta: ((chunk: string) => void) | undefined): void {
+  if (!onDelta) return;
+
+  for (const piece of text.split(/(\s+)/)) {
+    if (piece !== '') onDelta(piece);
+  }
 }

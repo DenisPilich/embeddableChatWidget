@@ -77,6 +77,25 @@ test.describe('виджет на странице клиента', () => {
     );
   });
 
+  test('ответ появляется по мере генерации, а не целиком в конце', async ({ page }) => {
+    await page.locator('.ecw-launcher').click();
+
+    const input = page.locator('.ecw-input');
+    await input.fill('what are your opening hours');
+    await input.press('Enter');
+
+    // Пока ответ ещё не готов, текст уже виден: это и есть поток. Отдельный
+    // класс, потому что это не сообщение переписки, а предварительный показ.
+    const streaming = page.locator('.ecw-message--streaming');
+    await expect(streaming).toBeVisible();
+    await expect(streaming.locator('.ecw-message__bubble')).toContainText(STUB_REPLY_PREFIX);
+
+    // Готовый ответ вытесняет показ: в переписке он остаётся ровно один, и
+    // предварительного больше нет.
+    await expect(page.locator('.ecw-message--streaming')).toHaveCount(0);
+    await expect(page.locator('.ecw-message--ai', { hasText: STUB_REPLY_PREFIX })).toHaveCount(1);
+  });
+
   test('разметка в сообщении не исполняется', async ({ page }) => {
     await page.locator('.ecw-launcher').click();
 

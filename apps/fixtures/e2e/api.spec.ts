@@ -188,6 +188,37 @@ test.describe('API виджета', () => {
     expect(authors).toContain('ai');
   });
 
+  test('отправка умеет отвечать потоком событий', async ({ request }) => {
+    const { first } = requireSites();
+    const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');
+
+    const response = await request.post(`${apiBase}/api/v1/messages`, {
+      headers: {
+        Origin: session.origin,
+        Authorization: `Bearer ${session.token}`,
+        Accept: 'text/event-stream',
+      },
+      data: { clientId: `stream-${String(Date.now())}`, body: 'hello' },
+    });
+
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('text/event-stream');
+
+    const body = await response.text();
+    // Порядок событий и есть контракт: подтверждение приёма, куски текста,
+    // готовое сообщение. Виджет полагается на каждый из них.
+    const accepted = body.indexOf('event: accepted');
+    const delta = body.indexOf('event: delta');
+    const done = body.indexOf('event: done');
+
+    expect(accepted).toBeGreaterThanOrEqual(0);
+    expect(delta).toBeGreaterThan(accepted);
+    expect(done).toBeGreaterThan(delta);
+    // В готовом событии лежит сообщение с номером — по нему виджет сдвигает
+    // курсор, чтобы не получить тот же ответ ещё раз опросом.
+    expect(body).toContain('"seq"');
+  });
+
   test('курсор отдаёт только то, что после указанного номера', async ({ request }) => {
     const { first } = requireSites();
     const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');

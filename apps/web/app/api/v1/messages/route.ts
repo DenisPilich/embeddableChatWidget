@@ -2,14 +2,16 @@ import type { ChatMessage, MessagesResponse, SendMessageResponse } from '@ecw/sh
 import type { Message } from '@prisma/client';
 import type { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { authenticateWidget } from '@/lib/auth';
 import { HISTORY_TURNS, answerQuestion, toChatTurns } from '@/lib/assistant';
+import type { ChatTurn } from '@/lib/ai';
+import { authenticateWidget } from '@/lib/auth';
 import {
   ConversationNotFoundError,
   appendMessage,
   listMessages,
   listRecentMessages,
 } from '@/lib/data';
+import { corsHeaders } from '@/lib/cors';
 import {
   errorResponse,
   jsonResponse,
@@ -30,6 +32,12 @@ import {
  * избыточность: токен может истечь между запросами, а диалог из токена обязан
  * принадлежать тому же сайту — иначе по украденному токену можно было бы читать
  * чужую переписку.
+ *
+ * Отправка умеет отвечать двумя способами. Обычный JSON — полный ответ сразу.
+ * Поток событий (`Accept: text/event-stream`) — текст по мере генерации; его
+ * просит виджет, чтобы посетитель видел ответ, а не ждал молча. Выбор делает
+ * клиент заголовком, а не отдельным адресом: тело запроса и проверки у обоих
+ * способов одинаковые.
  */
 
 export const dynamic = 'force-dynamic';
@@ -76,7 +84,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 /** Отправка сообщения посетителя. */
-export async function POST(request: Request): Promise<NextResponse> {
+export async function POST(request: Request): Promise<Response> {
   const origin = requestOrigin(request);
 
   const claims = await authenticateWidget(request);
@@ -88,47 +96,27 @@ export async function POST(request: Request): Promise<NextResponse> {
   const body = parsed.data.body.trim();
   if (!body) return errorResponse('empty_message', 400, origin);
 
+  let history: ChatTurn[];
+  let stored: { message: Message; duplicate: boolean };
+
   try {
     // Историю забираем ДО записи вопроса. Иначе он попал бы в переписку дважды:
     // один раз как последняя реплика истории, второй — как сам вопрос.
-    const previous = await listRecentMessages({
-      siteId: claims.siteId,
-      conversationId: claims.conversationId,
-      limit: HISTORY_TURNS,
-    });
+    history = toChatTurns(
+      await listRecentMessages({
+        siteId: claims.siteId,
+        conversationId: claims.conversationId,
+        limit: HISTORY_TURNS,
+      }),
+    );
 
-    const { message, duplicate } = await appendMessage({
+    stored = await appendMessage({
       siteId: claims.siteId,
       conversationId: claims.conversationId,
       author: 'VISITOR',
       clientId: parsed.data.clientId,
       body,
     });
-
-    // Ответ на повторную отправку не генерируем: он уже есть, и каждый повтор
-    // порождал бы новую реплику.
-    //
-    // `answerQuestion` не бросает исключение — посетитель получит ответ в любом
-    // случае: от модели, про исчерпанный бюджет или про недоступность. Поэтому
-    // здесь нет обработки ошибок модели: она живёт внутри.
-    if (!duplicate) {
-      const outcome = await answerQuestion({
-        siteId: claims.siteId,
-        question: body,
-        history: toChatTurns(previous),
-      });
-
-      await appendMessage({
-        siteId: claims.siteId,
-        conversationId: claims.conversationId,
-        author: 'AI',
-        body: outcome.text,
-      });
-    }
-
-    const response: SendMessageResponse = { message: toWireMessage(message), duplicate };
-    // Повторная отправка ничего не создала — отвечаем как за обычный успех.
-    return jsonResponse(response, duplicate ? 200 : 201, origin);
   } catch (error) {
     if (error instanceof ConversationNotFoundError) {
       return errorResponse('conversation_not_found', 404, origin);
@@ -136,6 +124,135 @@ export async function POST(request: Request): Promise<NextResponse> {
     console.error('[ecw] не удалось записать сообщение', error);
     return errorResponse('server_error', 500, origin);
   }
+
+  const wantsStream = (request.headers.get('accept') ?? '').includes('text/event-stream');
+  if (!wantsStream) {
+    // Повторную отправку не переспрашиваем: ответ на неё уже есть, и каждый
+    // повтор порождал бы новую реплику.
+    if (!stored.duplicate) {
+      await replyTo({
+        siteId: claims.siteId,
+        conversationId: claims.conversationId,
+        question: body,
+        history,
+      });
+    }
+
+    const response: SendMessageResponse = {
+      message: toWireMessage(stored.message),
+      duplicate: stored.duplicate,
+    };
+    // Повторная отправка ничего не создала — отвечаем как за обычный успех.
+    return jsonResponse(response, stored.duplicate ? 200 : 201, origin);
+  }
+
+  return streamReply({
+    origin,
+    signal: request.signal,
+    siteId: claims.siteId,
+    conversationId: claims.conversationId,
+    question: body,
+    history,
+    visitor: stored.message,
+    duplicate: stored.duplicate,
+  });
+}
+
+/** Спрашивает модель и записывает ответ как обычное сообщение диалога. */
+async function replyTo(params: {
+  siteId: string;
+  conversationId: string;
+  question: string;
+  history: readonly ChatTurn[];
+  onDelta?: (text: string) => void;
+  signal?: AbortSignal;
+}): Promise<Message> {
+  const outcome = await answerQuestion({
+    siteId: params.siteId,
+    question: params.question,
+    history: params.history,
+    ...(params.onDelta === undefined ? {} : { onDelta: params.onDelta }),
+    ...(params.signal === undefined ? {} : { signal: params.signal }),
+  });
+
+  const stored = await appendMessage({
+    siteId: params.siteId,
+    conversationId: params.conversationId,
+    author: 'AI',
+    body: outcome.text,
+  });
+  return stored.message;
+}
+
+/** Отвечает потоком событий: подтверждение приёма, куски текста, готовое сообщение. */
+function streamReply(params: {
+  origin: string;
+  signal: AbortSignal;
+  siteId: string;
+  conversationId: string;
+  question: string;
+  history: readonly ChatTurn[];
+  visitor: Message;
+  duplicate: boolean;
+}): Response {
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: string, data: unknown): void => {
+        try {
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        } catch {
+          // Посетитель закрыл окно и соединение. Генерацию не прерываем: ответ
+          // всё равно надо записать, иначе оператор не увидит, что отвечали.
+        }
+      };
+
+      try {
+        // Подтверждение приёма идёт первым: виджет снимает состояние
+        // «отправляется», не дожидаясь ответа модели.
+        send('accepted', {
+          message: toWireMessage(params.visitor),
+          duplicate: params.duplicate,
+        });
+
+        if (!params.duplicate) {
+          const answer = await replyTo({
+            siteId: params.siteId,
+            conversationId: params.conversationId,
+            question: params.question,
+            history: params.history,
+            onDelta: (text) => {
+              send('delta', { text });
+            },
+            signal: params.signal,
+          });
+          send('done', { message: toWireMessage(answer) });
+        }
+      } catch (error) {
+        console.error('[ecw] не удалось ответить в потоке', error);
+        send('error', { error: 'server_error' });
+      } finally {
+        try {
+          controller.close();
+        } catch {
+          // Поток уже закрыт — например, клиент ушёл и чтение прекратилось.
+        }
+      }
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      // Ни кэш, ни посредник не должны копить ответ: иначе весь смысл потока
+      // теряется и текст придёт одним куском в самом конце.
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
+      ...corsHeaders(params.origin),
+    },
+  });
 }
 
 /** Приводит сообщение из базы к общему контракту. */

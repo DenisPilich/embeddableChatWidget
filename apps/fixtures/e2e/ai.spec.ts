@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { activeEndpoint, activeModel, providerName } from '../../web/lib/ai';
 import { buildBody, createChatCompletionsProvider } from '../../web/lib/ai/chat-completions';
+import { ProviderError } from '../../web/lib/ai/provider';
 
 /**
  * Проверки слоя модели.
@@ -116,6 +117,65 @@ test.describe('слой модели', () => {
     await expect(provider.answer(REQUEST)).rejects.toThrow(/пустой/);
   });
 
+  test('поток разбирается по кускам, расход берётся из последнего события', async () => {
+    const collected: string[] = [];
+    const body = [
+      'data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"lo"}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"!"}}],"usage":{"prompt_tokens":5,"completion_tokens":3}}\n\n',
+      'data: [DONE]\n\n',
+    ].join('');
+
+    const provider = createChatCompletionsProvider({
+      name: 'test',
+      apiKey: 'ключ',
+      endpoint: 'https://example.invalid/chat/completions',
+      fetchImpl: () =>
+        Promise.resolve(
+          new Response(body, {
+            status: 200,
+            headers: { 'Content-Type': 'text/event-stream' },
+          }),
+        ),
+    });
+
+    const result = await provider.answer({
+      ...REQUEST,
+      onDelta: (text) => {
+        collected.push(text);
+      },
+    });
+
+    // Куски отдаются вызывающему сразу, а не одним куском в конце: в этом и
+    // смысл потока.
+    expect(collected).toEqual(['Hel', 'lo', '!']);
+    expect(result.text).toBe('Hello!');
+    expect(result.inputTokens).toBe(5);
+    expect(result.outputTokens).toBe(3);
+  });
+
+  test('без отчёта о расходе токены оцениваются, а не считаются нулём', async () => {
+    // Так ведут себя некоторые сервисы в потоковом режиме. Ноль означал бы, что
+    // дневной бюджет перестал ограничивать расход ровно там, где им пользуются.
+    const provider = createChatCompletionsProvider({
+      name: 'test',
+      apiKey: 'ключ',
+      endpoint: 'https://example.invalid/chat/completions',
+      fetchImpl: () =>
+        Promise.resolve(
+          new Response('data: {"choices":[{"delta":{"content":"Hello there"}}]}\n\n', {
+            status: 200,
+            headers: { 'Content-Type': 'text/event-stream' },
+          }),
+        ),
+    });
+
+    const result = await provider.answer({ ...REQUEST, onDelta: () => undefined });
+
+    expect(result.outputTokens).toBeGreaterThan(0);
+    expect(result.inputTokens).toBeGreaterThan(0);
+  });
+
   test.describe('живая модель', () => {
     test.skip(!readApiKey(), 'нет ключа модели в apps/web/.env');
 
@@ -128,7 +188,7 @@ test.describe('слой модели', () => {
         endpoint: activeEndpoint(),
       });
 
-      const result = await provider.answer({
+      const request = {
         ...REQUEST,
         question: 'Reply with the single word: ready',
         systemPrompt: 'Answer with one word only.',
@@ -138,7 +198,27 @@ test.describe('слой модели', () => {
         // Не двадцать: модели, которые «думают», тратят часть предела на
         // размышление, и при тесном пределе ответ приходит пустым.
         maxTokens: 128,
-      });
+      };
+
+      let result;
+      try {
+        result = await provider.answer(request);
+      } catch (error) {
+        const status = error instanceof ProviderError ? error.status : null;
+
+        // Занятость сервиса не означает, что настройка неверна: ключ, адрес и
+        // имя модели при этом могут быть совершенно правильными. Бесплатные
+        // тарифы ограничивают число запросов в сутки — у Gemini это двадцать, —
+        // и набор, краснеющий от исчерпанной чужой квоты, приучает не смотреть
+        // на красное. Поэтому помечаем проверку пропущенной, а не упавшей.
+        test.skip(
+          status === 429 || (status !== null && status >= 500),
+          `сервис модели занят или исчерпана квота (ответ ${String(status)})`,
+        );
+
+        // Всё остальное — настоящая поломка настройки, и её надо видеть.
+        throw error;
+      }
 
       expect(result.text.length).toBeGreaterThan(0);
 

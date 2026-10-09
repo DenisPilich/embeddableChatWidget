@@ -164,6 +164,14 @@ export class ChatWidget implements WidgetInstance {
   private readonly history: WidgetMessage[] = [];
   private opened = false;
   private unread = 0;
+  /**
+   * Текст ответа, пришедший по кускам.
+   *
+   * Живёт только здесь и только до окончания ответа: незаконченный ответ нельзя
+   * ни сохранять, ни показывать оператору. В переписку он попадает, когда
+   * приходит целиком.
+   */
+  private draft = '';
 
   constructor(
     private readonly options: InitOptions,
@@ -242,6 +250,7 @@ export class ChatWidget implements WidgetInstance {
     // Подписка на входящие и открытие сессии. Неудачу открытия разбирает тот,
     // кто создал транспорт: виджету в этот момент показать посетителю нечего.
     this.transport.onMessages((messages) => this.handleIncoming(messages));
+    this.transport.onDelta((text) => this.handleDelta(text));
     void this.transport.connect();
   }
 
@@ -398,11 +407,18 @@ export class ChatWidget implements WidgetInstance {
    * ошибка отправки.
    */
   private async deliver(outgoing: WidgetMessage): Promise<void> {
+    // Новый ответ начинается с чистого листа: предварительный показ предыдущего
+    // к нему не относится.
+    this.draft = '';
+    this.messages.setStreamingText(null);
+
     try {
       await this.transport.send({ clientId: outgoing.id, body: outgoing.body });
       this.updateStatus(outgoing.id, 'sent');
       // Набор показываем сразу после подтверждения: ответ придёт не мгновенно.
-      this.messages.setTyping(true);
+      // Но если первые куски уже пришли, показывать нечего — ответ пошёл, и
+      // индикатор только мигал бы поверх текста.
+      if (this.draft === '') this.messages.setTyping(true);
     } catch (error) {
       this.updateStatus(outgoing.id, 'failed');
       console.error('[ecw] не удалось отправить сообщение', error);
@@ -417,6 +433,9 @@ export class ChatWidget implements WidgetInstance {
     this.messages.setTyping(false);
 
     for (const message of incoming) {
+      // Настоящий ответ вытесняет предварительный показ: дальше он не нужен.
+      if (message.authorKind !== 'visitor') this.draft = '';
+
       this.appendMessage({
         id: message.id,
         authorKind: message.authorKind,
@@ -428,6 +447,16 @@ export class ChatWidget implements WidgetInstance {
     }
   }
 
+  /** Показывает ответ по мере появления. */
+  private handleDelta(text: string): void {
+    // Первый же кусок означает, что ответ пошёл: индикатор набора больше не
+    // нужен, его место занимает сам текст.
+    this.messages.setTyping(false);
+
+    this.draft += text;
+    this.messages.setStreamingText(this.draft);
+  }
+
   /**
    * Добавляет сообщение: в список, в представление и в хранилище.
    *
@@ -435,6 +464,11 @@ export class ChatWidget implements WidgetInstance {
    * сообщение обязано проходить здесь.
    */
   private appendMessage(message: WidgetMessage): void {
+    // Одно и то же сообщение может прийти дважды: из локального кэша при запуске
+    // и из добора пропущенного. В переписке оно должно быть одно — без этой
+    // проверки ответ задваивался бы у каждого, кто вернулся на страницу.
+    if (this.history.some((known) => known.id === message.id)) return;
+
     this.history.push(message);
     this.messages.append(message);
     this.persist();

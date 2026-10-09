@@ -144,6 +144,8 @@ This flexibility is not decoration. While building the project, Groq's signup fl
 
 Daily spend is capped per site (`dailyTokenBudget`) and recorded in the database. When the cap is reached the assistant says so, and the message stays in the conversation for a human. Model keys and prompts are never sent to the browser.
 
+Free tiers are small. Gemini's free plan allows roughly twenty requests per day for a model like `gemini-3.6-flash`, which a single afternoon of clicking through the demo will exhaust. When the service refuses, the assistant says it is unavailable and the question waits for a human — the demo degrades instead of breaking, which is the whole point.
+
 Check that a key, an address and a model name actually work — one real request, a fraction of a cent:
 
 ```powershell

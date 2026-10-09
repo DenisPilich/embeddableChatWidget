@@ -15,6 +15,9 @@ export class MessagesView {
   private readonly typingRow: HTMLElement;
   private readonly nodes = new Map<string, HTMLElement>();
   private readonly timeFormatter: Intl.DateTimeFormat;
+  /** Предварительный показ ответа: существует только на экране, не в переписке. */
+  private streamingRow: HTMLElement | null = null;
+  private streamingBubble: HTMLElement | null = null;
 
   constructor(scrollContainer: HTMLElement, log: HTMLElement, typingRow: HTMLElement) {
     this.scrollContainer = scrollContainer;
@@ -28,6 +31,10 @@ export class MessagesView {
   }
 
   append(message: WidgetMessage): void {
+    // Окончательное сообщение вытесняет предварительный показ: иначе один и тот
+    // же ответ остался бы в переписке дважды.
+    this.setStreamingText(null);
+
     const row = this.buildRow(message);
     this.nodes.set(message.id, row);
 
@@ -36,6 +43,43 @@ export class MessagesView {
     if (this.typingRow.hidden) this.log.append(row);
     else this.log.insertBefore(row, this.typingRow);
 
+    this.scrollToLatest();
+  }
+
+  /**
+   * Показывает ответ по мере появления.
+   *
+   * `null` убирает показ. Отдельного сообщения в переписке для этого нет: это
+   * предварительный показ, который заменится настоящим сообщением. Хранить его
+   * нельзя — незаконченный ответ не должен переживать перезагрузку страницы и
+   * попадать оператору.
+   */
+  setStreamingText(text: string | null): void {
+    if (text === null) {
+      this.streamingRow?.remove();
+      this.streamingRow = null;
+      this.streamingBubble = null;
+      return;
+    }
+
+    if (!this.streamingRow || !this.streamingBubble) {
+      const row = document.createElement('div');
+      row.className = 'ecw-message ecw-message--ai ecw-message--streaming';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'ecw-message__bubble';
+
+      row.append(bubble);
+      this.streamingRow = row;
+      this.streamingBubble = bubble;
+
+      if (this.typingRow.hidden) this.log.append(row);
+      else this.log.insertBefore(row, this.typingRow);
+    }
+
+    // Только textContent: ответ модели — такой же чужой текст, как и сообщение
+    // посетителя, и вставлять его через innerHTML нельзя.
+    this.streamingBubble.textContent = text;
     this.scrollToLatest();
   }
 

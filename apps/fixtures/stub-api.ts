@@ -21,6 +21,18 @@ import type { Connect, Plugin } from 'vite';
 /** Начало ответа двойника. По нему тесты отличают ответ от местного приветствия. */
 export const STUB_REPLY_PREFIX = 'Stub reply to';
 
+/** Пауза между кусками потока, мс. Нужна только проверкам, чтобы успеть увидеть текст. */
+const STREAM_PIECE_DELAY_MS = 40;
+
+/**
+ * Пауза перед первым куском, мс.
+ *
+ * Модель не начинает отвечать мгновенно: она «думает». Без этой паузы поток
+ * неотличим от обычного ответа — индикатор набора не успевает появиться, и
+ * проверка на него перестала бы что-либо значить.
+ */
+const STREAM_THINK_MS = 300;
+
 interface StubMessage {
   id: string;
   seq: number;
@@ -189,10 +201,43 @@ export function stubApi(): Plugin {
         }
 
         const own = push(conversation, 'visitor', text, clientId);
-        // Ответ готовится здесь же, как на настоящем сервере: к моменту опроса
-        // он уже лежит в диалоге.
-        push(conversation, 'ai', `${STUB_REPLY_PREFIX} "${text}"`);
-        send(res, 201, { message: own, duplicate: false });
+        const answerText = `${STUB_REPLY_PREFIX} "${text}"`;
+
+        if (!(req.headers.accept ?? '').includes('text/event-stream')) {
+          // Ответ готовится здесь же, как на настоящем сервере: к моменту опроса
+          // он уже лежит в диалоге.
+          push(conversation, 'ai', answerText);
+          send(res, 201, { message: own, duplicate: false });
+          return;
+        }
+
+        // Поток, как у настоящего сервера: подтверждение приёма, куски текста,
+        // готовое сообщение. Запись в диалог происходит в КОНЦЕ — иначе опрос
+        // успел бы забрать ответ раньше, чем он закончился, и текст задвоился бы.
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+
+        const write = (event: string, data: unknown): void => {
+          res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        };
+
+        write('accepted', { message: own, duplicate: false });
+
+        await delay(STREAM_THINK_MS);
+
+        for (const piece of answerText.split(/(\s+)/)) {
+          if (piece === '') continue;
+          write('delta', { text: piece });
+          // Пауза нужна проверкам: без неё поток заканчивается раньше, чем тест
+          // успевает увидеть промежуточный текст.
+          await delay(STREAM_PIECE_DELAY_MS);
+        }
+
+        const answer = push(conversation, 'ai', answerText);
+        write('done', { message: answer });
+        res.end();
         return;
       }
     }
@@ -229,4 +274,10 @@ function send(res: ServerResponse, status: number, payload: unknown): void {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.end(JSON.stringify(payload));
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }

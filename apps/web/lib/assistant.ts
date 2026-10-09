@@ -53,6 +53,10 @@ export async function answerQuestion(params: {
   question: string;
   /** Реплики до текущего вопроса: сам вопрос добавляется отдельно. */
   history: readonly ChatTurn[];
+  /** Вызывается по мере появления текста. */
+  onDelta?: (text: string) => void;
+  /** Отмена: посетитель закрыл окно, и платить за остаток ответа незачем. */
+  signal?: AbortSignal;
 }): Promise<AnswerOutcome> {
   const settings = (await findAiSettings(params.siteId)) ?? DEFAULT_SETTINGS;
 
@@ -65,7 +69,7 @@ export async function answerQuestion(params: {
       spent,
       budget: settings.dailyTokenBudget,
     });
-    return { text: BUDGET_EXHAUSTED, source: 'budget', tokens: 0 };
+    return notice(BUDGET_EXHAUSTED, 'budget', params.onDelta);
   }
 
   try {
@@ -77,6 +81,8 @@ export async function answerQuestion(params: {
       model: settings.model,
       temperature: settings.temperature,
       maxTokens: MAX_ANSWER_TOKENS,
+      ...(params.onDelta === undefined ? {} : { onDelta: params.onDelta }),
+      ...(params.signal === undefined ? {} : { signal: params.signal }),
     });
 
     const tokens = result.inputTokens + result.outputTokens;
@@ -85,8 +91,24 @@ export async function answerQuestion(params: {
     return { text: result.text, source: provider.name, tokens };
   } catch (error) {
     console.error('[ecw] модель не ответила', error);
-    return { text: UNAVAILABLE, source: 'none', tokens: 0 };
+    return notice(UNAVAILABLE, 'none', params.onDelta);
   }
+}
+
+/**
+ * Ответ, который не пришёл от модели.
+ *
+ * Отдаётся через тот же обработчик кусков, что и настоящий: иначе в потоковом
+ * режиме посетитель не увидел бы ни извинения, ни сообщения о бюджете до самого
+ * конца ответа, а то и вовсе — если соединение оборвётся.
+ */
+function notice(
+  text: string,
+  source: string,
+  onDelta: ((text: string) => void) | undefined,
+): AnswerOutcome {
+  onDelta?.(text);
+  return { text, source, tokens: 0 };
 }
 
 /**
