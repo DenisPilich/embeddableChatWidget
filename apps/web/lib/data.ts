@@ -330,3 +330,35 @@ export async function resetAnswerFailures(params: {
     data: { answerFailures: 0 },
   });
 }
+
+/**
+ * Сколько сообщений посетителя пришло в диалог с указанного времени.
+ *
+ * Считаем именно сообщения посетителя: ответы ассистента — следствие, и
+ * ограничивать надо то, что приходит снаружи.
+ */
+export async function countRecentVisitorMessages(params: {
+  siteId: string;
+  conversationId: string;
+  since: Date;
+}): Promise<number> {
+  return prisma.message.count({
+    where: {
+      conversationId: params.conversationId,
+      // Ограничение по сайту идёт через связь: у сообщения своего siteId нет.
+      conversation: { siteId: params.siteId },
+      author: 'VISITOR',
+      createdAt: { gte: params.since },
+    },
+  });
+}
+
+/** Сколько новых посетителей пришло на сайт с указанного времени. */
+export async function countRecentVisitors(params: {
+  siteId: string;
+  since: Date;
+}): Promise<number> {
+  return prisma.visitor.count({
+    where: { siteId: params.siteId, createdAt: { gte: params.since } },
+  });
+}

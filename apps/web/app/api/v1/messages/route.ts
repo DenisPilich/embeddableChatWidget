@@ -9,17 +9,20 @@ import {
   ConversationNotFoundError,
   appendMessage,
   countAnswerFailure,
+  countRecentVisitorMessages,
   listMessages,
   listRecentMessages,
   requestHuman,
 } from '@/lib/data';
 import { corsHeaders } from '@/lib/cors';
+import { messagesPerMinute, minuteAgo } from '@/lib/limits';
 import {
   errorResponse,
   jsonResponse,
   preflightResponse,
   readJson,
   requestOrigin,
+  tooManyRequests,
 } from '@/lib/http';
 
 /**
@@ -106,6 +109,21 @@ export async function POST(request: Request): Promise<Response> {
 
   const body = parsed.data.body.trim();
   if (!body) return errorResponse('empty_message', 400, origin);
+
+  // Предел на сообщения в диалоге. Считаем по базе, а не в памяти: серверные
+  // функции не хранят состояние между вызовами.
+  const recent = await countRecentVisitorMessages({
+    siteId: claims.siteId,
+    conversationId: claims.conversationId,
+    since: minuteAgo(),
+  });
+  if (recent >= messagesPerMinute()) {
+    console.warn('[ecw] слишком часто пишут в диалог', {
+      conversationId: claims.conversationId,
+      recent,
+    });
+    return tooManyRequests(origin);
+  }
 
   let history: ChatTurn[];
   let stored: { message: Message; duplicate: boolean };

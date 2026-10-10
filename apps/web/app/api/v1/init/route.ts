@@ -9,7 +9,10 @@ import {
   preflightResponse,
   readJson,
   requestOrigin,
+  tooManyRequests,
 } from '@/lib/http';
+import { countRecentVisitors } from '@/lib/data';
+import { hourAgo, newVisitorsPerHour } from '@/lib/limits';
 import { signWidgetToken, verifyWidgetToken } from '@/lib/tokens';
 
 /**
@@ -64,6 +67,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       siteId: site.id,
     });
     return errorResponse('origin_not_allowed', 403, origin);
+  }
+
+  // Предел на число новых посетителей: разговор заводится один раз на человека,
+  // и лавина новых диалогов — первый признак, что сайт кто-то перебирает.
+  const visitors = await countRecentVisitors({ siteId: site.id, since: hourAgo() });
+  if (visitors >= newVisitorsPerHour()) {
+    console.warn('[ecw] слишком много новых посетителей', { siteId: site.id, visitors });
+    return tooManyRequests(origin, 3600);
   }
 
   // Токен подписан нами, поэтому посетителя можно узнать. Но только в пределах

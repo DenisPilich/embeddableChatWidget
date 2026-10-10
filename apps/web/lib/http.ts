@@ -19,6 +19,18 @@ export function errorResponse(code: string, status: number, origin: string): Nex
 }
 
 /**
+ * Слишком часто.
+ *
+ * `Retry-After` — не формальность: по нему клиент понимает, когда возвращаться,
+ * вместо того чтобы долбить сервер вслепую.
+ */
+export function tooManyRequests(origin: string, retryAfterSeconds = 60): NextResponse {
+  const response = errorResponse('rate_limited', 429, origin);
+  response.headers.set('Retry-After', String(retryAfterSeconds));
+  return response;
+}
+
+/**
  * Ответ на предварительный запрос браузера.
  *
  * Источник здесь не проверяется: этот запрос и существует для того, чтобы

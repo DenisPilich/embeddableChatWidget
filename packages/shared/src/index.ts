@@ -89,4 +89,5 @@ export type ApiErrorCode =
   | 'unauthorized'
   | 'empty_message'
   | 'conversation_not_found'
+  | 'rate_limited'
   | 'server_error';
