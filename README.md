@@ -79,6 +79,30 @@ To try the widget against the real backend, point `data-ecw-api` in the stand's 
 
 The stands are covered by Playwright tests (`apps/fixtures/e2e`). They check that the widget appears, opens and closes, sends a message and receives an answer, that styles stay isolated in both directions, that a transformed `body` does not break positioning, that focus is trapped and restored, and that markup in a visitor's message is never executed. The tests run on the system Chrome, so no browser download is required.
 
+## Operator dashboard
+
+The other side of the widget: the person who takes over when the assistant steps aside.
+
+```bash
+pnpm.cmd dev                       # fixtures stand on :5173
+pnpm.cmd --filter @ecw/web dev     # backend and dashboard on :3000
+```
+
+Then open http://localhost:3000/dashboard. The seed creates a demo operator:
+
+- email `demo@example.com`
+- password `demo-operator-2026`
+
+Those are development credentials from the seed, not a secret. The seed also creates a **second** operator with their own workspace and site — not for completeness, but because tenant isolation can only be tested with two of them.
+
+What the dashboard does:
+
+- **Queue, waiting first.** Conversations that asked for a human come first, longest wait at the top. A queue where you cannot tell whom to pick up next is a list, not a queue.
+- **Read the conversation and reply.** A reply is stored as an `agent` message and reaches the visitor the same way the assistant's answers do.
+- **Close it.** Closing clears the waiting flag; until then the assistant stays quiet, so the visitor never reads two different people answering in turn.
+
+Authorisation is one check in one place: a conversation is found only if its site belongs to a workspace the operator is a member of. Anything else is a 404 rather than a 403 — whether somebody else's conversation exists is none of your business either.
+
 ## How it gets embedded
 
 ```html

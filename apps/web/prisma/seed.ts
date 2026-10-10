@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { activeModel } from '../lib/ai';
+import { hashPassword } from '../lib/password';
 import { prisma } from '../lib/prisma';
 
 /**
@@ -66,6 +67,20 @@ const SITES: readonly SiteSeed[] = [
   },
 ];
 
+/**
+ * Пароль демонстрационного оператора.
+ *
+ * Лежит открытым текстом намеренно: это данные разработки для локального
+ * стенда, а не секрет. В рабочем развёртывании оператора заводит владелец и
+ * пароль задаёт он — сид туда не запускается.
+ */
+const OPERATOR_PASSWORD = 'demo-operator-2026';
+
+/** Второе рабочее пространство: на нём проверяется недоступность чужого. */
+const SECOND_WORKSPACE_ID = 'ws_demo_second';
+const SECOND_OWNER_EMAIL = 'second@example.com';
+const SECOND_SITE_ID = 'site_second_owner';
+
 async function main(): Promise<void> {
   const workspace = await prisma.workspace.upsert({
     where: { id: WORKSPACE_ID },
@@ -75,8 +90,14 @@ async function main(): Promise<void> {
 
   const owner = await prisma.user.upsert({
     where: { email: OWNER_EMAIL },
-    update: {},
-    create: { email: OWNER_EMAIL, name: 'Владелец демо-сайта' },
+    // Пароль обновляем при каждом запуске: наполнение — источник правды для
+    // данных разработки, и «пароль забыли поменять в сиде» здесь невозможно.
+    update: { passwordHash: await hashPassword(OPERATOR_PASSWORD) },
+    create: {
+      email: OWNER_EMAIL,
+      name: 'Владелец демо-сайта',
+      passwordHash: await hashPassword(OPERATOR_PASSWORD),
+    },
   });
 
   await prisma.membership.upsert({
@@ -84,6 +105,44 @@ async function main(): Promise<void> {
     update: { role: 'OWNER' },
     create: { userId: owner.id, workspaceId: workspace.id, role: 'OWNER' },
   });
+
+  // Второй владелец со своим пространством и сайтом. Он нужен не для полноты
+  // картины: на нём проверяется, что оператор не видит чужие диалоги. Без
+  // второго владельца эту проверку поставить не на чем.
+  const secondWorkspace = await prisma.workspace.upsert({
+    where: { id: SECOND_WORKSPACE_ID },
+    update: {},
+    create: { id: SECOND_WORKSPACE_ID, name: 'Второе пространство' },
+  });
+
+  const secondOwner = await prisma.user.upsert({
+    where: { email: SECOND_OWNER_EMAIL },
+    update: { passwordHash: await hashPassword(OPERATOR_PASSWORD) },
+    create: {
+      email: SECOND_OWNER_EMAIL,
+      name: 'Второй владелец',
+      passwordHash: await hashPassword(OPERATOR_PASSWORD),
+    },
+  });
+
+  await prisma.membership.upsert({
+    where: { userId_workspaceId: { userId: secondOwner.id, workspaceId: secondWorkspace.id } },
+    update: { role: 'OWNER' },
+    create: { userId: secondOwner.id, workspaceId: secondWorkspace.id, role: 'OWNER' },
+  });
+
+  const secondSiteExisting = await prisma.site.findUnique({ where: { id: SECOND_SITE_ID } });
+  if (secondSiteExisting === null) {
+    await prisma.site.create({
+      data: {
+        id: SECOND_SITE_ID,
+        workspaceId: secondWorkspace.id,
+        name: 'Stand "Second owner"',
+        publicKey: `pub_${randomBytes(16).toString('base64url')}`,
+        allowedOrigins: ['http://localhost:5175'],
+      },
+    });
+  }
 
   const summary: { id: string; name: string; publicKey: string; allowedOrigins: string[] }[] = [];
 
@@ -137,6 +196,19 @@ async function main(): Promise<void> {
 
   // Ключи для автотестов. Вписывать их в тесты руками нельзя: они случайные, и
   // после пересоздания базы тесты начали бы падать загадочным образом.
+  //
+  // Второй владелец попадает сюда наравне с остальными: тесты проверяют на нём,
+  // что оператор не видит чужие диалоги, а для этого нужен его публичный ключ.
+  const secondSite = await prisma.site.findUnique({ where: { id: SECOND_SITE_ID } });
+  if (secondSite !== null) {
+    summary.push({
+      id: secondSite.id,
+      name: secondSite.name,
+      publicKey: secondSite.publicKey,
+      allowedOrigins: secondSite.allowedOrigins,
+    });
+  }
+
   writeFileSync(SEED_FILE, `${JSON.stringify({ sites: summary }, null, 2)}\n`, 'utf8');
 
   console.log('Наполнение выполнено.');

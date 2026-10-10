@@ -1,4 +1,4 @@
-import type { Conversation, Message, Site, Visitor } from '@prisma/client';
+import type { Conversation, Message, Site, User, Visitor } from '@prisma/client';
 import { prisma } from './prisma';
 
 /**
@@ -122,6 +122,8 @@ export async function appendMessage(params: {
   body: string;
   /** Только для сообщений посетителя: на нём держится защита от повторов. */
   clientId?: string;
+  /** Кто из людей ответил, если это оператор. */
+  authorUserId?: string;
 }): Promise<{ message: Message; duplicate: boolean }> {
   if (params.clientId) {
     const existing = await findMessageByClientId(params.conversationId, params.clientId);
@@ -145,6 +147,7 @@ export async function appendMessage(params: {
         seq,
         author: params.author,
         clientId: params.clientId ?? null,
+        authorUserId: params.authorUserId ?? null,
         body: params.body,
       },
     });
@@ -360,5 +363,133 @@ export async function countRecentVisitors(params: {
 }): Promise<number> {
   return prisma.visitor.count({
     where: { siteId: params.siteId, createdAt: { gte: params.since } },
+  });
+}
+
+/** Пользователь по адресу почты. Адрес сравниваем в нижнем регистре. */
+export async function findUserByEmail(email: string): Promise<User | null> {
+  return prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+}
+
+export async function findUserById(id: string): Promise<User | null> {
+  return prisma.user.findUnique({ where: { id } });
+}
+
+/** Рабочие пространства, в которых состоит оператор. Граница его доступа. */
+export async function listMembershipWorkspaceIds(userId: string): Promise<string[]> {
+  const memberships = await prisma.membership.findMany({
+    where: { userId },
+    select: { workspaceId: true },
+  });
+
+  return memberships.map((membership) => membership.workspaceId);
+}
+
+export interface QueueItem {
+  id: string;
+  status: Conversation['status'];
+  humanRequestedAt: Date | null;
+  updatedAt: Date;
+  siteName: string;
+  lastSeq: number;
+  lastMessage: string | null;
+}
+
+/**
+ * Очередь диалогов для оператора.
+ *
+ * Сначала те, кто ждёт человека, — и дольше всех ждущие первыми. Очередь, в
+ * которой непонятно, кого брать, — не очередь, а список.
+ *
+ * Граница доступа задана рабочими пространствами оператора: чужие диалоги в
+ * выборку не попадают вовсе, а не отсеиваются потом.
+ */
+export async function listOperatorQueue(params: {
+  workspaceIds: readonly string[];
+  limit: number;
+}): Promise<QueueItem[]> {
+  const conversations = await prisma.conversation.findMany({
+    where: { site: { workspaceId: { in: [...params.workspaceIds] } } },
+    orderBy: [
+      // Пустые значения в конце: Postgres по умолчанию ставит их в начало при
+      // сортировке по убыванию, и без этого ожидающие уехали бы в хвост.
+      { humanRequestedAt: { sort: 'asc', nulls: 'last' } },
+      { updatedAt: 'desc' },
+    ],
+    take: params.limit,
+    select: {
+      id: true,
+      status: true,
+      humanRequestedAt: true,
+      updatedAt: true,
+      lastSeq: true,
+      site: { select: { name: true } },
+      messages: { orderBy: { seq: 'desc' }, take: 1, select: { body: true } },
+    },
+  });
+
+  return conversations.map((conversation) => ({
+    id: conversation.id,
+    status: conversation.status,
+    humanRequestedAt: conversation.humanRequestedAt,
+    updatedAt: conversation.updatedAt,
+    siteName: conversation.site.name,
+    lastSeq: conversation.lastSeq,
+    lastMessage: conversation.messages[0]?.body ?? null,
+  }));
+}
+
+/**
+ * Диалог, доступный оператору.
+ *
+ * Это единственная проверка доступа к чужой переписке, и она здесь: диалог
+ * находится, только если его сайт принадлежит рабочему пространству оператора.
+ * Отдельной проверки «а можно ли» нет намеренно — её забыли бы в одном из мест.
+ */
+export async function findOperatorConversation(params: {
+  workspaceIds: readonly string[];
+  conversationId: string;
+}): Promise<(Conversation & { site: Site }) | null> {
+  return prisma.conversation.findFirst({
+    where: {
+      id: params.conversationId,
+      site: { workspaceId: { in: [...params.workspaceIds] } },
+    },
+    include: { site: true },
+  });
+}
+
+/**
+ * Ответ оператора.
+ *
+ * Ожидание человека при этом НЕ снимается: раз человек вмешался, ассистент
+ * остаётся в стороне до закрытия диалога. Иначе модель и оператор отвечали бы по
+ * очереди, и посетитель читал бы двух собеседников.
+ */
+export async function appendAgentMessage(params: {
+  siteId: string;
+  conversationId: string;
+  operatorId: string;
+  body: string;
+}): Promise<Message> {
+  const stored = await appendMessage({
+    siteId: params.siteId,
+    conversationId: params.conversationId,
+    author: 'AGENT',
+    body: params.body,
+    authorUserId: params.operatorId,
+  });
+
+  return stored.message;
+}
+
+/** Закрывает диалог. Ожидание человека снимается: разговор окончен. */
+export async function closeConversation(params: {
+  siteId: string;
+  conversationId: string;
+}): Promise<void> {
+  await prisma.conversation.updateMany({
+    where: { id: params.conversationId, siteId: params.siteId, status: 'OPEN' },
+    data: { status: 'CLOSED', humanRequestedAt: null, answerFailures: 0 },
   });
 }

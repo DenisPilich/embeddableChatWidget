@@ -19,9 +19,15 @@ export function messagesPerMinute(): number {
   return readLimit('ECW_LIMIT_MESSAGES_PER_MINUTE', 20);
 }
 
-/** Сколько новых посетителей принимаем на сайт за час. */
+/**
+ * Сколько новых посетителей принимаем на сайт за час.
+ *
+ * Тысяча, а не шестьдесят: у работающего сайта и шестьдесят новых людей в час —
+ * обычное дело, и предел, который их отсекает, ломал бы работу, а не защищал.
+ * Этот предел — против лавины, а не против трафика.
+ */
 export function newVisitorsPerHour(): number {
-  return readLimit('ECW_LIMIT_VISITORS_PER_HOUR', 60);
+  return readLimit('ECW_LIMIT_VISITORS_PER_HOUR', 1000);
 }
 
 function readLimit(name: string, fallback: number): number {
