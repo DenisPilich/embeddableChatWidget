@@ -48,6 +48,8 @@ interface StubConversation {
   token: string;
   seq: number;
   messages: StubMessage[];
+  /** Ждёт ли диалог живого оператора. Ассистент в этом случае молчит. */
+  waiting: boolean;
 }
 
 interface RecordedRequest {
@@ -73,6 +75,7 @@ export function stubApi(): Plugin {
       token: `stub-token-${String(created)}`,
       seq: 0,
       messages: [],
+      waiting: false,
     };
     conversations.set(conversation.token, conversation);
     return conversation;
@@ -164,7 +167,24 @@ export function stubApi(): Plugin {
         token: conversation.token,
         conversationId: conversation.id,
         lastSeq: conversation.seq,
+        waitingForHuman: conversation.waiting,
       });
+      return;
+    }
+
+    if (url.pathname === '/api/v1/handover') {
+      const conversation = conversations.get(authorization.slice('Bearer '.length));
+      if (!conversation) {
+        send(res, 401, { error: 'unauthorized' });
+        return;
+      }
+
+      if (!conversation.waiting) {
+        conversation.waiting = true;
+        push(conversation, 'ai', 'An operator has been asked to join this conversation.');
+      }
+
+      send(res, 200, { waitingForHuman: true });
       return;
     }
 
@@ -201,6 +221,25 @@ export function stubApi(): Plugin {
         }
 
         const own = push(conversation, 'visitor', text, clientId);
+
+        // Диалог ждёт оператора — ассистент молчит. Ответа не будет ни в обычном
+        // режиме, ни в потоке.
+        if (conversation.waiting) {
+          if (!(req.headers.accept ?? '').includes('text/event-stream')) {
+            send(res, 201, { message: own, duplicate: false });
+            return;
+          }
+
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache, no-transform');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.write(`event: accepted\ndata: ${JSON.stringify({ message: own })}\n\n`);
+          res.write(`event: idle\ndata: ${JSON.stringify({ waitingForHuman: true })}\n\n`);
+          res.end();
+          return;
+        }
+
         const answerText = `${STUB_REPLY_PREFIX} "${text}"`;
 
         if (!(req.headers.accept ?? '').includes('text/event-stream')) {

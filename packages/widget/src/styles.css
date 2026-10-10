@@ -226,6 +226,42 @@
   opacity: 0.82;
 }
 
+/*
+  Кнопка «позвать человека».
+
+  Выглядит как ссылка, а не как кнопка: это не основное действие окна, и
+  перетягивать на себя внимание от поля ввода она не должна. Но остаётся
+  настоящей кнопкой — с клавиатуры, для программ чтения с экрана и с понятной
+  областью нажатия.
+*/
+.ecw-link {
+  flex: none;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.ecw-link:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.ecw-link:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.ecw-link[hidden] {
+  display: none;
+}
+
 .ecw-icon-button {
   display: grid;
   place-items: center;

@@ -49,8 +49,11 @@ const MARKUP = `
     <header class="ecw-header">
       <div class="ecw-header__text">
         <p class="ecw-header__title">Chat</p>
-        <p class="ecw-header__status">Assistant replies</p>
+        <p class="ecw-header__status" data-ecw-status>Assistant replies</p>
       </div>
+      <button type="button" class="ecw-link" data-ecw-action="human" data-ecw-human>
+        Talk to a human
+      </button>
       <button
         type="button"
         class="ecw-icon-button"
@@ -155,6 +158,8 @@ export class ChatWidget implements WidgetInstance {
   private readonly launcher: HTMLButtonElement;
   private readonly badge: HTMLElement;
   private readonly panel: HTMLElement;
+  private readonly status: HTMLElement;
+  private readonly humanButton: HTMLElement;
   private readonly input: HTMLTextAreaElement;
   private readonly sendButton: HTMLButtonElement;
   private readonly composer: HTMLFormElement;
@@ -172,6 +177,8 @@ export class ChatWidget implements WidgetInstance {
    * приходит целиком.
    */
   private draft = '';
+  /** Ждёт ли диалог живого оператора. Управляет подписью в шапке и кнопкой. */
+  private waiting = false;
 
   constructor(
     private readonly options: InitOptions,
@@ -198,6 +205,8 @@ export class ChatWidget implements WidgetInstance {
     shadow.append(container);
 
     this.panel = mustFind<HTMLElement>(shadow, '.ecw-panel');
+    this.status = mustFind<HTMLElement>(shadow, '[data-ecw-status]');
+    this.humanButton = mustFind<HTMLElement>(shadow, '[data-ecw-human]');
     this.launcher = mustFind<HTMLButtonElement>(shadow, '.ecw-launcher');
     this.badge = mustFind<HTMLElement>(shadow, '.ecw-badge');
     this.input = mustFind<HTMLTextAreaElement>(shadow, '[data-ecw-input]');
@@ -251,7 +260,19 @@ export class ChatWidget implements WidgetInstance {
     // кто создал транспорт: виджету в этот момент показать посетителю нечего.
     this.transport.onMessages((messages) => this.handleIncoming(messages));
     this.transport.onDelta((text) => this.handleDelta(text));
-    void this.transport.connect();
+    this.transport.onIdle(() => {
+      this.handleIdle();
+    });
+    void this.transport
+      .connect()
+      .then(() => {
+        // Состояние ожидания известно только после открытия сессии: диалог мог
+        // ждать оператора ещё с прошлого визита.
+        this.setWaiting(this.transport.waitingForHuman);
+      })
+      .catch((error: unknown) => {
+        console.error('[ecw] не удалось открыть сессию', error);
+      });
   }
 
   open(): void {
@@ -304,6 +325,44 @@ export class ChatWidget implements WidgetInstance {
     const action = target.closest('[data-ecw-action]')?.getAttribute('data-ecw-action');
     if (action === 'toggle') this.toggle();
     else if (action === 'close') this.close();
+    else if (action === 'human') void this.askForHuman();
+  }
+
+  /**
+   * Просит живого оператора.
+   *
+   * Состояние ожидания включается сразу, не дожидаясь ответа сервера: кнопка
+   * нажата, и повторное нажатие ничего не изменит. Если запрос не прошёл —
+   * возвращаем кнопку и говорим об этом в журнал: обещать оператора, которого
+   * не позвали, нельзя.
+   */
+  private async askForHuman(): Promise<void> {
+    // Кнопка скрывается в состоянии ожидания, но нажать её могли до этого:
+    // второй запрос ничего не изменит, а в переписке появилась бы лишняя
+    // реплика про оператора.
+    if (this.waiting) return;
+
+    this.setWaiting(true);
+
+    try {
+      await this.transport.requestHuman();
+      this.appendMessage(
+        this.createMessage('ai', 'An operator has been asked to join this conversation.'),
+      );
+      this.registerIncoming();
+    } catch (error) {
+      this.setWaiting(false);
+      console.error('[ecw] не удалось позвать оператора', error);
+    }
+  }
+
+  /** Показывает и скрывает состояние «ждём оператора». */
+  private setWaiting(waiting: boolean): void {
+    this.waiting = waiting;
+    this.host.toggleAttribute('data-ecw-waiting', waiting);
+
+    this.status.textContent = waiting ? 'An operator will reply' : 'Assistant replies';
+    this.humanButton.hidden = waiting;
   }
 
   /**
@@ -455,6 +514,13 @@ export class ChatWidget implements WidgetInstance {
 
     this.draft += text;
     this.messages.setStreamingText(this.draft);
+  }
+
+  /** Отвечать нечем: ответа не будет. */
+  private handleIdle(): void {
+    this.messages.setTyping(false);
+
+    if (this.transport.waitingForHuman) this.setWaiting(true);
   }
 
   /**

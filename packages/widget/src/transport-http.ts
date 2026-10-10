@@ -58,6 +58,11 @@ export interface HttpTransportOptions {
 export class HttpTransport implements Transport {
   private handler: MessagesHandler | null = null;
   private deltaHandler: DeltaHandler | null = null;
+  private idleHandler: (() => void) | null = null;
+  /** Ждёт ли диалог оператора. Узнаём при открытии сессии. */
+  private waiting = false;
+  /** Пришёл ли готовый ответ в этом потоке. Нужно, чтобы понять «ответа не будет». */
+  private sawAnswer = false;
   /** Ждёт подтверждения приёма сообщения, которое завершает `send`. */
   private confirmAccepted: (() => void) | null = null;
   /** Пропуск посетителя. Живёт в хранилище браузера между загрузками страницы. */
@@ -84,6 +89,33 @@ export class HttpTransport implements Transport {
     this.deltaHandler = handler;
   }
 
+  onIdle(handler: () => void): void {
+    this.idleHandler = handler;
+  }
+
+  get waitingForHuman(): boolean {
+    return this.waiting;
+  }
+
+  async requestHuman(): Promise<void> {
+    await this.ensureSession();
+
+    try {
+      await this.request<unknown>('/api/v1/handover', { method: 'POST', authorized: true });
+    } catch (error) {
+      // Токен мог просрочиться — как и при отправке сообщения, молча берём новый.
+      if (error instanceof HttpError && error.status === 401) {
+        this.token = null;
+        await this.connect();
+        await this.request<unknown>('/api/v1/handover', { method: 'POST', authorized: true });
+      } else {
+        throw error;
+      }
+    }
+
+    this.waiting = true;
+  }
+
   async connect(): Promise<void> {
     this.token = loadToken(this.options.siteId);
 
@@ -94,6 +126,7 @@ export class HttpTransport implements Transport {
 
     this.token = session.token;
     saveToken(this.options.siteId, session.token);
+    this.waiting = session.waitingForHuman;
     // Отступаем на окно назад, а не встаём на последний номер: иначе то, что
     // пришло, пока страница была закрыта, не увидит никто.
     this.cursor = Math.max(0, session.lastSeq - CATCH_UP_WINDOW);
@@ -136,6 +169,7 @@ export class HttpTransport implements Transport {
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
     this.handler = null;
     this.deltaHandler = null;
+    this.idleHandler = null;
   }
 
   private async ensureSession(): Promise<void> {
@@ -167,6 +201,7 @@ export class HttpTransport implements Transport {
       this.confirmAccepted = resolve;
     });
 
+    this.sawAnswer = false;
     void this.readEvents(response);
     await accepted;
   }
@@ -209,6 +244,11 @@ export class HttpTransport implements Transport {
       // Если подтверждения так и не было, `send` не должен ждать вечно.
       this.confirmAccepted?.();
       this.confirmAccepted = null;
+
+      // Поток закончился, а готового ответа в нём не было: значит отвечать
+      // нечем. Сообщаем виджету, иначе он остался бы с индикатором набора
+      // навсегда.
+      if (!this.sawAnswer) this.idleHandler?.();
     }
   }
 
@@ -239,8 +279,16 @@ export class HttpTransport implements Transport {
       if (name === 'done' && payload.message) {
         // Курсор сдвигаем сразу: иначе ближайший опрос вернул бы то же
         // сообщение второй раз.
+        this.sawAnswer = true;
         this.cursor = Math.max(this.cursor, payload.message.seq);
         this.handler?.([payload.message]);
+        return;
+      }
+
+      if (name === 'idle') {
+        // Сервер прямо говорит, что ответа не будет: диалог ждёт оператора.
+        this.waiting = true;
+        this.idleHandler?.();
       }
     } catch {
       // Неполное или служебное событие. Поток продолжается, терять нечего.

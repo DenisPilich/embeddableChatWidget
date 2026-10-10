@@ -1,6 +1,13 @@
 import type { Message } from '@prisma/client';
 import { activeModel, resolveProvider, type ChatTurn } from './ai';
-import { findAiSettings, recordTokenUsage, tokensUsedToday, type AiSettings } from './data';
+import {
+  findAiSettings,
+  isWaitingForHuman,
+  recordTokenUsage,
+  resetAnswerFailures,
+  tokensUsedToday,
+  type AiSettings,
+} from './data';
 
 /**
  * Ассистент: связывает вопрос посетителя с провайдером модели.
@@ -50,6 +57,7 @@ export interface AnswerOutcome {
 
 export async function answerQuestion(params: {
   siteId: string;
+  conversationId: string;
   question: string;
   /** Реплики до текущего вопроса: сам вопрос добавляется отдельно. */
   history: readonly ChatTurn[];
@@ -58,6 +66,14 @@ export async function answerQuestion(params: {
   /** Отмена: посетитель закрыл окно, и платить за остаток ответа незачем. */
   signal?: AbortSignal;
 }): Promise<AnswerOutcome> {
+  // Посетитель позвал человека — ассистент замолкает. Иначе оператор и модель
+  // отвечали бы по очереди, и посетитель читал бы двух разных собеседников.
+  // Пустой текст означает «отвечать нечем»: обработчик в этом случае ничего не
+  // записывает, а виджету про ожидание сообщает отдельно.
+  if (await isWaitingForHuman(params)) {
+    return { text: '', source: 'human', tokens: 0 };
+  }
+
   const settings = (await findAiSettings(params.siteId)) ?? DEFAULT_SETTINGS;
 
   // Бюджет проверяется ДО обращения к модели: платить за ответ, который всё
@@ -87,6 +103,10 @@ export async function answerQuestion(params: {
 
     const tokens = result.inputTokens + result.outputTokens;
     if (tokens > 0) await recordTokenUsage(params.siteId, tokens);
+
+    // Ответ получился — счётчик неудач обнуляется: он считает именно неудачи
+    // ПОДРЯД, иначе разовые сбои за месяц сложились бы в ложную тревогу.
+    await resetAnswerFailures(params);
 
     return { text: result.text, source: provider.name, tokens };
   } catch (error) {

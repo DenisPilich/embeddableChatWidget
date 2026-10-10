@@ -260,3 +260,73 @@ function startOfUtcDay(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
+
+/**
+ * Просит живого оператора для диалога.
+ *
+ * Возвращает `true`, если просьба записана впервые. Повторный вызов ничего не
+ * меняет и возвращает `false`: посетитель может нажать кнопку дважды, и второй
+ * раз не должен сбрасывать время ожидания — по нему оператор понимает, кто ждёт
+ * дольше всех.
+ */
+export async function requestHuman(params: {
+  siteId: string;
+  conversationId: string;
+}): Promise<boolean> {
+  const updated = await prisma.conversation.updateMany({
+    // Условие по сайту обязательно: без него чужой диалог можно было бы позвать
+    // в операторы.
+    where: { id: params.conversationId, siteId: params.siteId, humanRequestedAt: null },
+    data: { humanRequestedAt: new Date(), answerFailures: 0 },
+  });
+
+  return updated.count > 0;
+}
+
+/** Ждёт ли диалог оператора. */
+export async function isWaitingForHuman(params: {
+  siteId: string;
+  conversationId: string;
+}): Promise<boolean> {
+  const conversation = await prisma.conversation.findFirst({
+    where: { id: params.conversationId, siteId: params.siteId },
+    select: { humanRequestedAt: true },
+  });
+
+  if (conversation === null) return false;
+  return conversation.humanRequestedAt !== null;
+}
+
+/**
+ * Считает неудачный ответ модели.
+ *
+ * Возвращает новое число неудач подряд или `null`, если диалога нет. Счётчик
+ * нужен, чтобы отличить разовую неудачу сервиса от постоянной: при постоянной
+ * посетителю предлагается человек, а не бесконечное «попробуйте позже».
+ *
+ * Приращение делает база, а не код: два одновременных запроса не потеряются.
+ */
+export async function countAnswerFailure(params: {
+  siteId: string;
+  conversationId: string;
+}): Promise<number | null> {
+  const rows = await prisma.$queryRaw<{ answerFailures: number }[]>`
+    UPDATE "conversations"
+    SET "answerFailures" = "answerFailures" + 1, "updatedAt" = NOW()
+    WHERE "id" = ${params.conversationId} AND "siteId" = ${params.siteId}
+    RETURNING "answerFailures"
+  `;
+
+  return rows[0]?.answerFailures ?? null;
+}
+
+/** Сбрасывает счётчик неудач после успешного ответа. */
+export async function resetAnswerFailures(params: {
+  siteId: string;
+  conversationId: string;
+}): Promise<void> {
+  await prisma.conversation.updateMany({
+    where: { id: params.conversationId, siteId: params.siteId, answerFailures: { gt: 0 } },
+    data: { answerFailures: 0 },
+  });
+}

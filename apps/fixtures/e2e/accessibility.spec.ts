@@ -15,16 +15,19 @@ test.describe('управление фокусом', () => {
     expect(await focusedInWidget(page)).toContain('ecw-panel');
   });
 
-  test('порядок обхода: крестик, переписка, поле ввода', async ({ page }) => {
+  test('порядок обхода: действия шапки, переписка, поле ввода', async ({ page }) => {
     const order: (string | null)[] = [];
-    for (let step = 0; step < 3; step += 1) {
+    for (let step = 0; step < 4; step += 1) {
       await page.keyboard.press('Tab');
       order.push(await focusedInWidget(page));
     }
 
-    expect(order[0]).toContain('ecw-icon-button');
-    expect(order[1]).toContain('ecw-body');
-    expect(order[2]).toContain('ecw-input');
+    // Порядок задан разметкой: сначала действия шапки — просьба позвать
+    // человека и закрытие, — затем переписка и поле ввода.
+    expect(order[0]).toContain('ecw-link');
+    expect(order[1]).toContain('ecw-icon-button');
+    expect(order[2]).toContain('ecw-body');
+    expect(order[3]).toContain('ecw-input');
   });
 
   test('Tab не выпускает фокус из окна', async ({ page }) => {

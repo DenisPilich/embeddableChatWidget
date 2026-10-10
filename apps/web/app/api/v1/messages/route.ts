@@ -8,8 +8,10 @@ import { authenticateWidget } from '@/lib/auth';
 import {
   ConversationNotFoundError,
   appendMessage,
+  countAnswerFailure,
   listMessages,
   listRecentMessages,
+  requestHuman,
 } from '@/lib/data';
 import { corsHeaders } from '@/lib/cors';
 import {
@@ -47,6 +49,15 @@ const PAGE_LIMIT = 100;
 
 /** Предельная длина сообщения. Ограничение защищает базу и бюджет ассистента. */
 const MAX_BODY_LENGTH = 4000;
+
+/**
+ * Сколько неудач подряд считаем признаком, что модель не справляется.
+ *
+ * Три, а не одна: разовый сбой сервиса — обычное дело, и предлагать человека
+ * после каждого — значит предлагать его всегда, в том числе когда ассистент
+ * прекрасно отвечает.
+ */
+const FAILURE_LIMIT = 3;
 
 const sendSchema = z.object({
   /** Идентификатор, присвоенный клиентом. На нём держится идемпотентность. */
@@ -166,14 +177,29 @@ async function replyTo(params: {
   history: readonly ChatTurn[];
   onDelta?: (text: string) => void;
   signal?: AbortSignal;
-}): Promise<Message> {
+}): Promise<Message | null> {
   const outcome = await answerQuestion({
     siteId: params.siteId,
+    conversationId: params.conversationId,
     question: params.question,
     history: params.history,
     ...(params.onDelta === undefined ? {} : { onDelta: params.onDelta }),
     ...(params.signal === undefined ? {} : { signal: params.signal }),
   });
+
+  if (outcome.source === 'none') {
+    // Модель не ответила. Считаем неудачи подряд: три — это уже не случайность,
+    // и посетителю нужен человек, а не бесконечное «попробуйте позже».
+    const failures = await countAnswerFailure(params);
+    if (failures !== null && failures >= FAILURE_LIMIT) {
+      console.warn('[ecw] модель не отвечает подряд, зовём оператора', { failures });
+      await requestHuman(params);
+    }
+  }
+
+  // Пустой текст означает «отвечать нечем»: например, диалог уже ждёт живого
+  // оператора, и ассистент молчит, чтобы не перебивать человека.
+  if (outcome.text === '') return null;
 
   const stored = await appendMessage({
     siteId: params.siteId,
@@ -227,7 +253,11 @@ function streamReply(params: {
             },
             signal: params.signal,
           });
-          send('done', { message: toWireMessage(answer) });
+
+          // Ответа может не быть: диалог ждёт живого оператора. Тогда сообщаем
+          // виджету прямо — иначе он остался бы с индикатором набора навсегда.
+          if (answer) send('done', { message: toWireMessage(answer) });
+          else send('idle', { waitingForHuman: true });
         }
       } catch (error) {
         console.error('[ecw] не удалось ответить в потоке', error);
