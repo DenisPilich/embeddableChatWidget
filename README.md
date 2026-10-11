@@ -72,12 +72,9 @@ The stands in `apps/fixtures` imitate a customer site and serve the built files 
 | `/hostile.html` | Hostile CSS: foreign `!important` on everything, scrolling disabled, a foreign layer with an enormous `z-index` |
 | `/csp.html` | Strict Content Security Policy: inline styles and scripts are forbidden |
 | `/spa.html` | Single-page app: container content replaced and `init` called again on navigation |
+| `/live.html` | The whole chain: this page talks to the **real backend**, so a question goes to the database and a request for a human shows up in the dashboard |
 
 The stands talk to a **test double** rather than the real backend. It lives inside the stand (`apps/fixtures/stub-api.ts`) and keeps messages in memory, so the widget tests run without a database, without secrets and without the network. The real backend is covered separately: `apps/fixtures/e2e/api.spec.ts` runs against Next.js and a real database, and is skipped when there is none.
-
-| Stand page | What it checks |
-|---|---|
-| `/live.html` | The whole chain: this page talks to the **real backend**, so a question goes to the database and a request for a human shows up in the dashboard |
 
 `/live.html` is the one to open when you want to see everything working together. It needs both servers (`pnpm dev` and `pnpm --filter @ecw/web dev`), and asks the assistant something, then presses "Talk to a human" — the conversation should be waiting in the dashboard queue, and an answer written there should appear in the widget.
 
