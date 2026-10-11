@@ -3,19 +3,23 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Little Cloud Coffee — customer site stand</title>
+    <title>Little Cloud Coffee — widget demo</title>
 
     <!--
-      Это стенд, изображающий сайт клиента, а не наш собственный интерфейс.
-      Он намеренно сделан «чужим»:
+      Это главная страница демонстрации: сайт вымышленной кофейни, на который
+      поставлен виджет. Она подключена к НАСТОЯЩЕМУ серверу — с базой, моделью и
+      панелью оператора. Тестовые стенды, которые говорят с двойником, лежат
+      рядом: stub.html и остальные.
 
-        * собственные стили в отдельном файле, без сборщика и без нашего стека;
-        * шрифт с засечками — приманка: наследуемые свойства проходят сквозь
-          границу Shadow DOM, и если текст внутри виджета окажется с засечками,
-          значит сброс на :host сделан неправильно;
-        * рядом лежат другие стенды: transform-body.html и будущие враждебные.
+      Ключ сайта подставляется на лету (см. live-stand.ts): он случаен и
+      создаётся при наполнении базы, поэтому вписывать его в файл нельзя.
+
+      Страница намеренно сделана «чужой»: свои стили в отдельном файле, шрифт с
+      засечками — приманка для проверки изоляции. Если текст внутри виджета
+      окажется с засечками, значит сброс наследуемых свойств сделан неправильно.
     -->
     <link rel="stylesheet" href="/site.css" />
+    <link rel="stylesheet" href="/demo.css" />
   </head>
   <body>
     <div class="wrap">
@@ -23,6 +27,27 @@
         <h1>Little Cloud Coffee</h1>
         <p class="tagline">Roasted on Tuesdays, baked every day</p>
       </header>
+
+      <section class="try" aria-labelledby="try-title">
+        <h2 id="try-title">Try the chat widget</h2>
+        <ol>
+          <li>Ask the assistant something in the corner — for example, about opening hours.</li>
+          <li>
+            Press <strong>Talk to a human</strong> in the chat window when you want an operator
+            instead of the assistant.
+          </li>
+          <li>
+            Open the <a href="http://localhost:3000/dashboard">operator dashboard</a> and sign in as
+            <code>demo@example.com</code> / <code>demo-operator-2026</code>. The conversation will
+            be waiting in the queue, and an answer written there appears in the widget.
+          </li>
+        </ol>
+        <p class="try__note">
+          Answers come from a real model, and the free plan allows about twenty questions a day —
+          worth knowing before asking a hundred. The chat window remembers the conversation in the
+          browser, so it survives a page reload.
+        </p>
+      </section>
 
       <p>
         We are a small coffee shop on the corner of Vinogradnaya and Pekarsky. Open since 2014, we
@@ -54,47 +79,22 @@
       </p>
 
       <footer>
-        <p>© Little Cloud Coffee. A widget development stand, the content is fictional.</p>
+        <p>
+          © Little Cloud Coffee. The shop is fictional: this page is a demonstration of an
+          embeddable chat widget.
+        </p>
       </footer>
     </div>
 
     <!--
-      Этот стенд намеренно подключён к двойнику серверной части, а не к
-      настоящему серверу: проверки виджета не должны зависеть от базы, ключей и
-      чужого сервиса. Человеку, который открыл страницу впервые, это неочевидно —
-      поэтому говорим прямо, а не оставляем догадываться по ответам «Stub reply
-      to». Настоящая цепочка — /live.html.
-    -->
-    <div
-      style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 5;
-        padding: 8px 16px;
-        background: #0f172a;
-        color: #e2e8f0;
-        font:
-          14px/1.5 system-ui,
-          sans-serif;
-        text-align: center;
-      "
-    >
-      Test stand: answers come from an in-memory double, not from a model — nothing here reaches the
-      database or the dashboard. For the real chain open
-      <a href="/live.html" style="color: #a5b4fc">/live.html</a>.
-    </div>
-
-    <!--
-      Ровно такую вставку получит клиент: одна строка, свой siteId, загрузка
-      не блокирует страницу. Скрипт раздаётся из packages/widget/dist
-      (см. publicDir в vite.config.ts) — то есть по обычному URL, как с CDN.
+      Ровно такую вставку получит клиент: одна строка, свой ключ сайта, загрузка
+      не блокирует страницу. Скрипт раздаётся из packages/widget/dist — то есть по
+      обычному URL, как с CDN.
     -->
     <script
       src="/ecw-loader.iife.js"
-      data-site-id="stand-kofeynya"
-      data-ecw-api="http://localhost:5173"
+      data-site-id="__SITE_ID__"
+      data-ecw-api="__API_URL__"
       async
     ></script>
   </body>

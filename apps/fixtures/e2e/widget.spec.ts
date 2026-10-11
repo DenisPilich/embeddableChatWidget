@@ -18,7 +18,7 @@ const widgetVersion = (
 
 test.describe('виджет на странице клиента', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
   });
 
   test('создаётся ровно один виджет, версия доступна со страницы', async ({ page }) => {

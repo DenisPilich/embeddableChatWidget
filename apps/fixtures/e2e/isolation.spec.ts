@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test.describe('изоляция от страницы клиента', () => {
   test('шрифт и цвет страницы не проникают внутрь виджета', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
 
     // Страница стенда набрана шрифтом с засечками — это приманка.
     // Наследуемые свойства проходят сквозь границу Shadow DOM, поэтому без
@@ -24,7 +24,7 @@ test.describe('изоляция от страницы клиента', () => {
   });
 
   test('стили виджета не протекают на страницу', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
 
     // Кладём на страницу элемент с нашими классами. Стили из shadow root
     // до него дотянуться не должны — иначе виджет ломает вёрстку клиента.
@@ -51,7 +51,7 @@ test.describe('изоляция от страницы клиента', () => {
   });
 
   test('вёрстка страницы не меняется от появления виджета', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
 
     // Виджет обязан быть нулевого размера и не занимать места в потоке.
     const hostBox = await page.locator('[data-ecw-host]').boundingBox();

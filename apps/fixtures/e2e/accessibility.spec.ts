@@ -3,7 +3,7 @@ import { focusedInWidget } from './helpers';
 
 test.describe('управление фокусом', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
 
     // Открываем окно с клавиатуры, как это сделал бы человек без мыши.
     await page.locator('.ecw-launcher').focus();

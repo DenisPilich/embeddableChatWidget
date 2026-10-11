@@ -16,7 +16,7 @@ async function sendAndClose(page: Page): Promise<void> {
 
 test.describe('счётчик непрочитанных', () => {
   test('ответ, пришедший в закрытое окно, показывается на кнопке', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
     await sendAndClose(page);
 
     const badge = page.locator('.ecw-badge');
@@ -32,7 +32,7 @@ test.describe('счётчик непрочитанных', () => {
   });
 
   test('открытие окна сбрасывает счётчик', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
     await sendAndClose(page);
 
     const badge = page.locator('.ecw-badge');
@@ -45,7 +45,7 @@ test.describe('счётчик непрочитанных', () => {
   });
 
   test('ответ при открытом окне счётчик не увеличивает', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
     await page.locator('.ecw-launcher').click();
 
     const input = page.locator('.ecw-input');

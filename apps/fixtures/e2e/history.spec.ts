@@ -3,7 +3,7 @@ import { STUB_APPEARANCE, STUB_REPLY_PREFIX } from '../stub-api';
 
 test.describe('переписка переживает перезагрузку', () => {
   test('сообщения восстанавливаются после перезагрузки страницы', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
     await page.locator('.ecw-launcher').click();
 
     const input = page.locator('.ecw-input');
@@ -30,7 +30,7 @@ test.describe('переписка переживает перезагрузку'
   });
 
   test('в пустой переписке показывается приветствие', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
 
     await expect(page.locator('.ecw-message--ai')).toHaveCount(1);
     // Текст приветствия задаёт владелец сайта, и он приходит с сервера.
@@ -51,7 +51,7 @@ test.describe('переписка переживает перезагрузку'
       });
     });
 
-    await page.goto('/');
+    await page.goto('/stub.html');
     await page.locator('.ecw-launcher').click();
 
     const input = page.locator('.ecw-input');
@@ -65,7 +65,7 @@ test.describe('переписка переживает перезагрузку'
   });
 
   test('повреждённые данные в хранилище не ломают виджет', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
 
     // Пишем мусор по тому же ключу, каким пользуется виджет. Так может
     // выглядеть старая версия виджета или чужой скрипт на той же странице.

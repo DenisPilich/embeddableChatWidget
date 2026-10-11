@@ -16,7 +16,7 @@ test.describe('загрузчик и ленивая загрузка', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/stub.html');
     await expect(page.locator('.ecw-launcher')).toBeVisible();
 
     const probe = await page.evaluate(() => window.__ecwProbe);
@@ -24,7 +24,7 @@ test.describe('загрузчик и ленивая загрузка', () => {
   });
 
   test('основной файл подключается отдельным скриптом из той же папки', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
     await expect(page.locator('.ecw-launcher')).toBeVisible();
 
     const injected = await page.evaluate(() => {
@@ -50,7 +50,7 @@ test.describe('загрузчик и ленивая загрузка', () => {
   });
 
   test('повторное подключение загрузчика не создаёт второй виджет', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
     await expect(page.locator('.ecw-launcher')).toBeVisible();
 
     // Клиент вставил сниппет второй раз — типичная история при сборке страницы
@@ -71,7 +71,7 @@ test.describe('загрузчик и ленивая загрузка', () => {
   });
 
   test('через загрузчик виджет работает так же, как при прямой вставке', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/stub.html');
     await page.locator('.ecw-launcher').click();
     await expect(page.locator('.ecw-panel')).toBeVisible();
 

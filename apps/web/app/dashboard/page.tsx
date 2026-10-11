@@ -60,7 +60,14 @@ export default async function DashboardPage() {
       </section>
 
       {queue.length === 0 ? (
-        <p className="dash__empty">No conversations yet.</p>
+        // Пустая панель обязана объяснять, как получить первый разговор: иначе
+        // непонятно, работает ли вообще то, что перед тобой.
+        <p className="dash__empty">
+          No conversations yet. Open the demo site on{' '}
+          <a href="http://localhost:5173">localhost:5173</a>, ask the assistant something, and press
+          “Talk to a human” — the conversation will appear here. It has to come from that page: the
+          other stands answer from a test double and never reach this database.
+        </p>
       ) : (
         <ul className="queue">
           {queue.map((item) => {

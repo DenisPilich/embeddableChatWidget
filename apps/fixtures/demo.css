@@ -1,0 +1,66 @@
+.try {
+  margin: 0 0 32px;
+  padding: 20px 24px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #4338ca;
+  border-radius: 12px;
+  background: #f8fafc;
+  /* Шрифт без засечек: это наш пояснительный блок, а не «чужой» контент сайта. */
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
+.try h2 {
+  margin-top: 0;
+  font-family: inherit;
+}
+
+.try ol {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.try li {
+  margin-bottom: 6px;
+}
+
+.try__note {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: #475569;
+}
+
+.try code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  font-size: 13px;
+}
+
+/*
+  Полоса для тестового стенда (stub.html).
+
+  Она нужна, чтобы человек не гадал, почему ассистент отвечает «Stub reply to»:
+  страница говорит об этом прямо, а не оставляет догадываться.
+*/
+.stand-note {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  padding: 8px 16px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font:
+    14px/1.5 system-ui,
+    sans-serif;
+  text-align: center;
+}
+
+.stand-note a {
+  color: #a5b4fc;
+}

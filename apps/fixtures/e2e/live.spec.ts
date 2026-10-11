@@ -18,7 +18,7 @@ test.describe('Связка виджета с настоящим серверо�
 
   test('страница стенда собирается с ключом сайта', async ({ page }) => {
     const { first } = requireSites();
-    await page.goto('/live.html');
+    await page.goto('/');
 
     // Ключ подставляется на лету из данных наполнения: без него страница
     // бесполезна, а понять это по пустому экрану нельзя.
@@ -32,7 +32,7 @@ test.describe('Связка виджета с настоящим серверо�
   });
 
   test('виджет на этой странице ходит в настоящий сервер, а не к двойнику', async ({ page }) => {
-    await page.goto('/live.html');
+    await page.goto('/');
     await page.locator('.ecw-launcher').click();
 
     // Двойник отдаёт свой заголовок окна как настройку стенда. Настоящий сервер
@@ -44,7 +44,7 @@ test.describe('Связка виджета с настоящим серверо�
   });
 
   test('просьба о человеке доходит до базы через панель', async ({ page }) => {
-    await page.goto('/live.html');
+    await page.goto('/');
     await page.locator('.ecw-launcher').click();
 
     await page.locator('.ecw-link').click();

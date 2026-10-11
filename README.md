@@ -2,7 +2,25 @@
 
 An embeddable chat widget: the site owner adds a single `<script>` line and gets a chat window on their page, where an LLM answers by default and a human operator joins only when needed.
 
-> **Status: phases 1 and 2 are complete.** The widget is published on npm and talks to a live backend. Phase 3 replaces the canned assistant with a real model.
+> **Status: the widget, the backend and the operator dashboard work end to end.** The widget is published on npm, a real model answers and streams its answer, the visitor can ask for a human, and the dashboard is where that human replies.
+
+## Quick start
+
+```powershell
+Copy-Item apps\web\.env.example apps\web\.env   # once: a secrets file with placeholders
+pnpm install
+pnpm dev                                        # build the widget and start everything
+```
+
+`pnpm dev` serves the demo site on http://localhost:5173 and the backend with the operator dashboard on http://localhost:3000. **Ctrl+C stops both.**
+
+Then:
+
+1. Open **http://localhost:5173** — a fictional coffee shop with the widget in the corner. This page talks to the real backend.
+2. Ask the assistant something, for example about opening hours.
+3. Press **Talk to a human**, then open **http://localhost:3000/dashboard** and sign in as `demo@example.com` / `demo-operator-2026`. The conversation is waiting in the queue, and an answer written there appears in the widget.
+
+A real model needs a key in `apps/web/.env` (see [Which model answers](#which-model-answers)) and a seeded database (`pnpm db:seed`). Without them everything still starts: the assistant answers from a canned provider, and the checks that need a database skip themselves.
 
 ## Why this project
 
@@ -46,8 +64,11 @@ The values inside are placeholders. They are enough for builds, checks and end-t
 
 ```bash
 pnpm install        # dependencies for every workspace package
-pnpm dev            # build the widget and serve the "customer site" stands on http://localhost:5173
-pnpm --filter @ecw/web dev   # backend on http://localhost:3000
+pnpm dev            # everything: the demo site on :5173 and the backend on :3000
+pnpm dev:stand      # only the stands on :5173
+pnpm dev:web        # only the backend on :3000
+pnpm db:seed        # create the demo site, the operator and the assistant settings
+pnpm db:reset-demo  # delete conversations and visitors, keep sites, users and settings
 pnpm build          # build every package
 pnpm typecheck      # type-check
 pnpm lint           # lint, including rules that need type information

@@ -54,6 +54,21 @@ export default tseslint.config(
   },
 
   {
+    // Файлы, которые выполняются в Node, а не в браузере: служебные скрипты и
+    // сам этот конфиг. У них есть process, console и таймеры, которых нет на
+    // странице, и без этого списка ESLint считал бы их опечатками.
+    files: ['**/*.mjs'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+      },
+    },
+  },
+
+  {
     // Виджет живёт на чужой странице, и каждое наше сообщение в консоли — это
     // мусор в консоли клиента. warn и error разрешены: это сигнал о нашей
     // проблеме, и его полезно увидеть. log, info и debug запрещены.

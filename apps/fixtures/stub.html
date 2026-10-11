@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Little Cloud Coffee — test stand</title>
+
+    <!--
+      Тестовый стенд: та же страница, что и главная, но подключённая к ДВОЙНИКУ
+      серверной части вместо настоящего сервера. Двойник живёт внутри
+      dev-сервера и держит сообщения в памяти, поэтому проверки виджета не
+      зависят от базы, ключей и чужого сервиса.
+
+      Именно на эту страницу ходят автотесты виджета. Главная страница
+      (index.html) показывает настоящую цепочку.
+    -->
+    <link rel="stylesheet" href="/site.css" />
+    <link rel="stylesheet" href="/demo.css" />
+  </head>
+  <body>
+    <p class="stand-note">
+      Test stand: answers come from an in-memory double, not from a model — nothing here reaches the
+      database or the dashboard. For the real thing open <a href="/">the main page</a>.
+    </p>
+
+    <div class="wrap">
+      <header>
+        <h1>Little Cloud Coffee</h1>
+        <p class="tagline">Roasted on Tuesdays, baked every day</p>
+      </header>
+
+      <p>
+        We are a small coffee shop on the corner of Vinogradnaya and Pekarskiy. Open since 2014, we
+        roast our own beans and serve nothing we would not drink ourselves.
+      </p>
+
+      <h2>Opening hours</h2>
+      <table class="hours">
+        <tbody>
+          <tr>
+            <th>Monday — Friday</th>
+            <td>08:00 — 21:00</td>
+          </tr>
+          <tr>
+            <th>Saturday</th>
+            <td>09:00 — 22:00</td>
+          </tr>
+          <tr>
+            <th>Sunday</th>
+            <td>09:00 — 19:00</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>How to find us</h2>
+      <p>
+        Vinogradnaya 14, the entrance is from the courtyard. If you see a queue outside, it moves
+        faster than it looks.
+      </p>
+
+      <footer>
+        <p>© Little Cloud Coffee. A widget development stand, the content is fictional.</p>
+      </footer>
+    </div>
+
+    <script
+      src="/ecw-loader.iife.js"
+      data-site-id="stand-kofeynya"
+      data-ecw-api="http://localhost:5173"
+      async
+    ></script>
+  </body>
+</html>
