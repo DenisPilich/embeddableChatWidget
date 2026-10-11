@@ -59,6 +59,34 @@
     </div>
 
     <!--
+      Этот стенд намеренно подключён к двойнику серверной части, а не к
+      настоящему серверу: проверки виджета не должны зависеть от базы, ключей и
+      чужого сервиса. Человеку, который открыл страницу впервые, это неочевидно —
+      поэтому говорим прямо, а не оставляем догадываться по ответам «Stub reply
+      to». Настоящая цепочка — /live.html.
+    -->
+    <div
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 5;
+        padding: 8px 16px;
+        background: #0f172a;
+        color: #e2e8f0;
+        font:
+          14px/1.5 system-ui,
+          sans-serif;
+        text-align: center;
+      "
+    >
+      Test stand: answers come from an in-memory double, not from a model — nothing here reaches the
+      database or the dashboard. For the real chain open
+      <a href="/live.html" style="color: #a5b4fc">/live.html</a>.
+    </div>
+
+    <!--
       Ровно такую вставку получит клиент: одна строка, свой siteId, загрузка
       не блокирует страницу. Скрипт раздаётся из packages/widget/dist
       (см. publicDir в vite.config.ts) — то есть по обычному URL, как с CDN.
