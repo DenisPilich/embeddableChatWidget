@@ -524,6 +524,17 @@ export async function listOperatorSites(params: {
   });
 }
 
+/**
+ * Первый сайт в базе.
+ *
+ * Нужен только демонстрационной странице: она изображает конкретную кофейню, и ей
+ * нужен ключ сайта, иначе виджет не запустится. Настоящему развёртыванию такая
+ * страница не нужна — там сайтов много и «первый» ничего не значит.
+ */
+export async function findFirstSite(): Promise<Site | null> {
+  return prisma.site.findFirst({ orderBy: { createdAt: 'asc' } });
+}
+
 /** Сохраняет настройки сайта. Доступ проверен до вызова. */
 export async function saveSiteSettings(params: {
   siteId: string;

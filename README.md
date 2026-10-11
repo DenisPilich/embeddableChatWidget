@@ -20,6 +20,8 @@ Then:
 2. Ask the assistant something, for example about opening hours.
 3. Press **Talk to a human**, then open **http://localhost:3000/dashboard** and sign in as `demo@example.com` / `demo-operator-2026`. The conversation is waiting in the queue, and an answer written there appears in the widget.
 
+The same page also lives inside the application, on **http://localhost:3000/demo**. It is the one to use after deployment: the widget is served from the application's own `/ecw/` folder and calls the API on the same domain, so one address holds everything. See [docs/DEPLOY.md](docs/DEPLOY.md).
+
 A real model needs a key in `apps/web/.env` (see [Which model answers](#which-model-answers)) and a seeded database (`pnpm db:seed`). Without them everything still starts: the assistant answers from a canned provider, and the checks that need a database skip themselves.
 
 ## Why this project
@@ -51,6 +53,7 @@ Today that answer comes from a canned assistant. Phase 3 puts a real model behin
 
 - **[docs/PLAN.md](docs/PLAN.md)** — phases, exit criteria, risks, and what we deliberately left out.
 - **[docs/DECISIONS.md](docs/DECISIONS.md)** — architecture decision log: context, alternatives, consequences.
+- **[docs/DEPLOY.md](docs/DEPLOY.md)** — how to put the demo online: Vercel settings, environment variables, what to check afterwards.
 
 ## Development
 

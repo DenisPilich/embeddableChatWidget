@@ -1,0 +1,114 @@
+/*
+  Демонстрационная страница намеренно сделана «чужой» для виджета: свои стили, свой
+  шрифт, никакого отношения к внутренностям виджета. Так и должно быть — клиент
+  вставляет одну строку и не знает, что внутри.
+*/
+.shop {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  /* Шрифт с засечками — приманка: если текст внутри виджета окажется с засечками,
+     значит сброс наследуемых свойств сломан. */
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1.65;
+  color: #1c1917;
+  background: #fffdf8;
+}
+
+.shop h1 {
+  margin: 0;
+  font-size: 34px;
+}
+
+.shop__tagline {
+  margin: 4px 0 28px;
+  color: #78716c;
+  font-style: italic;
+}
+
+.shop h2 {
+  margin-top: 32px;
+  font-size: 20px;
+}
+
+.shop__hours {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.shop__hours th,
+.shop__hours td {
+  padding: 6px 0;
+  border-bottom: 1px solid #e7e5e4;
+  text-align: left;
+  font-weight: normal;
+}
+
+.shop__hours td {
+  text-align: right;
+}
+
+.shop__try {
+  margin: 24px 0 32px;
+  padding: 20px 24px;
+  border: 1px solid #e7e5e4;
+  border-left: 4px solid #4338ca;
+  border-radius: 12px;
+  background: #f8fafc;
+  /* Пояснение — наше, а не «чужое»: поэтому без засечек. */
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
+.shop__try h2 {
+  margin-top: 0;
+  font-size: 17px;
+}
+
+.shop__try ol {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.shop__try li {
+  margin-bottom: 6px;
+}
+
+.shop__try code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  font-size: 13px;
+}
+
+.shop__note {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: #57534e;
+}
+
+.shop__error {
+  max-width: 44rem;
+  margin: 0 auto 40px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  font-size: 14px;
+}
+
+.shop footer {
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px solid #e7e5e4;
+  color: #78716c;
+  font-size: 14px;
+}
