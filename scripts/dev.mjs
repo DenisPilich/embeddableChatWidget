@@ -84,30 +84,30 @@ process.on('SIGTERM', () => {
 
 async function main() {
   const busy = [];
-  if (!(await isFree(STAND_PORT))) busy.push(`порт ${String(STAND_PORT)} (стенд)`);
-  if (!(await isFree(BACKEND_PORT))) busy.push(`порт ${String(BACKEND_PORT)} (сервер)`);
+  if (!(await isFree(STAND_PORT))) busy.push(`port ${String(STAND_PORT)} (the stand)`);
+  if (!(await isFree(BACKEND_PORT))) busy.push(`port ${String(BACKEND_PORT)} (the backend)`);
 
   if (busy.length > 0) {
-    console.error(`\nЗанято: ${busy.join(', ')}.`);
-    console.error('Скорее всего остался запущенным прошлый сервер. Закрой его окно');
-    console.error('или найди процесс: netstat -ano | findstr :3000\n');
+    console.error(`\nAlready in use: ${busy.join(', ')}.`);
+    console.error('A server from an earlier run is probably still alive. Close its window,');
+    console.error('or find it with: netstat -ano | findstr :3000\n');
     process.exit(1);
   }
 
-  console.log('Собираю виджет…\n');
+  console.log('Building the widget…\n');
   try {
     await waitForExit('pnpm --filter ecw-widget build');
   } catch (error) {
     console.error(
-      `\nВиджет не собрался: ${error instanceof Error ? error.message : String(error)}`,
+      `\nThe widget did not build: ${error instanceof Error ? error.message : String(error)}`,
     );
     process.exit(1);
   }
 
-  console.log('\nПоднимаю серверы. Ctrl+C выключит оба.\n');
-  console.log(`  Стенд с виджетом:  http://localhost:${String(STAND_PORT)}`);
-  console.log(`  Панель оператора:  http://localhost:${String(BACKEND_PORT)}/dashboard`);
-  console.log('  Вход в панель:     demo@example.com / demo-operator-2026\n');
+  console.log('\nStarting both servers. Ctrl+C stops them.\n');
+  console.log(`  Demo site:  http://localhost:${String(STAND_PORT)}`);
+  console.log(`  Dashboard:  http://localhost:${String(BACKEND_PORT)}/dashboard`);
+  console.log('  Sign in:    demo@example.com / demo-operator-2026\n');
 
   run(`pnpm --filter @ecw/fixtures dev`);
   run(`pnpm --filter @ecw/web dev`);
@@ -117,7 +117,7 @@ async function main() {
   for (const child of children) {
     child.on('close', (code) => {
       if (stopping || code === 0) return;
-      console.error(`\nСервер завершился с кодом ${String(code)} — гашу остальные.`);
+      console.error(`\nA server exited with code ${String(code)} — stopping the rest.`);
       stopAll();
       process.exit(1);
     });

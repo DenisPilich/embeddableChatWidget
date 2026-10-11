@@ -20,22 +20,24 @@ async function main(): Promise<void> {
   const conversations = await prisma.conversation.count();
   const visitors = await prisma.visitor.count();
 
-  console.log(`Удаляю диалоги (${String(conversations)}) и посетителей (${String(visitors)}).`);
-  console.log('Сайты, пользователи и настройки ассистента останутся на месте.');
+  console.log(
+    `Deleting conversations (${String(conversations)}) and visitors (${String(visitors)}).`,
+  );
+  console.log('Sites, users and assistant settings stay untouched.');
 
   // Сообщения уходят вместе с диалогами: у них внешний ключ с каскадом.
   const removedConversations = await prisma.conversation.deleteMany({});
   const removedVisitors = await prisma.visitor.deleteMany({});
 
   console.log(
-    `Готово: удалено диалогов ${String(removedConversations.count)}, посетителей ${String(removedVisitors.count)}.`,
+    `Done: removed ${String(removedConversations.count)} conversations and ${String(removedVisitors.count)} visitors.`,
   );
-  console.log('Панель оператора теперь пуста — самое время показать её людям.');
+  console.log('The dashboard is empty now — a good moment to show it to someone.');
 }
 
 main()
   .catch((error: unknown) => {
-    console.error('Уборка не удалась:', error);
+    console.error('Cleanup failed:', error);
     process.exitCode = 1;
   })
   .finally(() => {
