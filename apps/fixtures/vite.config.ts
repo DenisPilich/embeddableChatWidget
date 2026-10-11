@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { liveStand } from './live-stand';
 import { stubApi } from './stub-api';
 
 export default defineConfig({
@@ -7,6 +8,9 @@ export default defineConfig({
     // виджета при этом не зависят от живой базы и секретов. Настоящий сервер
     // проверяется в api.spec.ts.
     stubApi(),
+    // И одна страница, которая ходит в настоящий сервер: по ней видно всю связку
+    // целиком — виджет, база, модель и панель оператора.
+    liveStand(),
   ],
   server: {
     port: 5173,

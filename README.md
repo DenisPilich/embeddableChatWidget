@@ -75,9 +75,17 @@ The stands in `apps/fixtures` imitate a customer site and serve the built files 
 
 The stands talk to a **test double** rather than the real backend. It lives inside the stand (`apps/fixtures/stub-api.ts`) and keeps messages in memory, so the widget tests run without a database, without secrets and without the network. The real backend is covered separately: `apps/fixtures/e2e/api.spec.ts` runs against Next.js and a real database, and is skipped when there is none.
 
-To try the widget against the real backend, point `data-ecw-api` in the stand's script tag at `http://localhost:3000` and start the backend.
+| Stand page | What it checks |
+|---|---|
+| `/live.html` | The whole chain: this page talks to the **real backend**, so a question goes to the database and a request for a human shows up in the dashboard |
+
+`/live.html` is the one to open when you want to see everything working together. It needs both servers (`pnpm dev` and `pnpm --filter @ecw/web dev`), and asks the assistant something, then presses "Talk to a human" — the conversation should be waiting in the dashboard queue, and an answer written there should appear in the widget.
+
+The page is assembled on the fly rather than kept as a static file: the site key is random and created by the seed, so a hardcoded one would break after the database is recreated. See `apps/fixtures/live-stand.ts`.
 
 The stands are covered by Playwright tests (`apps/fixtures/e2e`). They check that the widget appears, opens and closes, sends a message and receives an answer, that styles stay isolated in both directions, that a transformed `body` does not break positioning, that focus is trapped and restored, and that markup in a visitor's message is never executed. The tests run on the system Chrome, so no browser download is required.
+
+The suite starts its own backend with a **canned** provider, so a real model is never called. Playwright reuses a server you already have running, though — and if that one is configured with a real key, the checks that would call the model **skip themselves** instead of spending your quota (Gemini's free tier is about twenty requests a day). A skipped check is visible in the report; silently passing would not be. Stop your own dev server if you want the full set to run.
 
 ## Operator dashboard
 

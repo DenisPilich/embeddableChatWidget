@@ -18,6 +18,31 @@ import {
 test.describe('API виджета', () => {
   test.skip(!readSeed(), 'нет данных наполнения: pnpm --filter @ecw/web db:seed');
 
+  /**
+   * Чем запущен сервер, знает только он сам.
+   *
+   * Набор поднимает свой — с заготовками вместо модели, — но Playwright
+   * переиспользует уже запущенный сервер разработчика, а там может стоять живая
+   * модель. Тогда проверки, которые её вызывают, пропускаются: настоящая модель
+   * тратит чужую квоту (у Gemini бесплатно двадцать запросов в сутки), а набор
+   * должен запускаться сколько угодно раз. Пропуск виден в отчёте, в отличие от
+   * молчаливого «прошло».
+   */
+  let provider = 'canned';
+
+  test.beforeAll(async ({ request }) => {
+    const response = await request.get(`${apiBase}/api/health/ai`);
+    const body = (await response.json()) as { provider?: unknown };
+    if (typeof body.provider === 'string') provider = body.provider;
+  });
+
+  function requiresCanned(): void {
+    test.skip(
+      provider !== 'canned',
+      `сервер запущен с провайдером «${provider}»: останови свой dev-сервер, набор поднимет свой с заготовками`,
+    );
+  }
+
   test('диагностика различает «настроено» и «работает»', async ({ request }) => {
     const configuration = await request.get(`${apiBase}/api/health/ai`);
     expect(configuration.status()).toBe(200);
@@ -27,14 +52,16 @@ test.describe('API виджета', () => {
       configured: boolean;
       hint?: string;
     };
-    // Проверки всегда идут на заготовках: набор с живой моделью стал бы платным,
-    // медленным и зависимым от чужого сервиса. Настоящая модель проверяется
-    // отдельно, в ai.spec.ts, и только когда ключ задан.
-    expect(info.provider).toBe('canned');
-    expect(info.configured).toBe(false);
-    // Обычный ответ обязан честно говорить, что ничего не проверял: однажды
-    // поле с именем `ready` означало лишь «ключ непустой» и ввело в заблуждение.
+
+    // Подсказка от модели не зависит: обычный ответ обязан честно говорить, что
+    // ничего не проверял. Однажды поле с именем `ready` означало лишь «ключ
+    // непустой» и ввело в заблуждение.
     expect(info.hint).toContain('check=1');
+
+    requiresCanned();
+
+    // А это уже про заготовки: у них ключа нет, и врать про «настроено» нельзя.
+    expect(info.configured).toBe(false);
 
     // Явная просьба проверить — единственный способ узнать, работает ли сервис.
     const checked = await request.get(`${apiBase}/api/health/ai?check=1`);
@@ -173,6 +200,7 @@ test.describe('API виджета', () => {
   });
 
   test('сообщение записывается, а ассистент отвечает', async ({ request }) => {
+    requiresCanned();
     const { first } = requireSites();
     const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');
 
@@ -189,6 +217,7 @@ test.describe('API виджета', () => {
   });
 
   test('отправка умеет отвечать потоком событий', async ({ request }) => {
+    requiresCanned();
     const { first } = requireSites();
     const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');
 
@@ -251,6 +280,7 @@ test.describe('API виджета', () => {
   });
 
   test('частые сообщения упираются в предел', async ({ request }) => {
+    requiresCanned();
     const { first } = requireSites();
     const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');
 
@@ -299,6 +329,7 @@ test.describe('API виджета', () => {
   });
 
   test('повторная отправка не создаёт второе сообщение', async ({ request }) => {
+    requiresCanned();
     const { first } = requireSites();
     const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');
 
