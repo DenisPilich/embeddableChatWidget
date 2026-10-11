@@ -1,3 +1,4 @@
+import type { WidgetAppearance } from '@ecw/shared';
 import type { WidgetMessage } from './types';
 
 /**
@@ -177,4 +178,52 @@ export function saveToken(siteId: string, token: string): void {
 
 function tokenKeyFor(siteId: string): string {
   return `ecw:${siteId}:token:v${FORMAT_VERSION}`;
+}
+
+/**
+ * Запомненный вид окна.
+ *
+ * Нужен не ради экономии запроса, а ради первого кадра: вид приходит вместе с
+ * сессией, то есть через сеть, а окно рисуется раньше. Без кэша возвращающийся
+ * посетитель видел бы, как кнопка перекрашивается через полсекунды после
+ * открытия страницы. С кэшем он видит свой цвет сразу, а серверное значение
+ * только уточняет его.
+ */
+export function loadAppearance(siteId: string): WidgetAppearance | null {
+  const storage = getStorage();
+  if (!storage) return null;
+
+  try {
+    const raw = storage.getItem(appearanceKeyFor(siteId));
+    if (!raw) return null;
+
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return null;
+
+    const candidate = parsed as Partial<WidgetAppearance>;
+    return {
+      color: typeof candidate.color === 'string' ? candidate.color : null,
+      title: typeof candidate.title === 'string' ? candidate.title : null,
+      greeting: typeof candidate.greeting === 'string' ? candidate.greeting : null,
+    };
+  } catch {
+    // Повреждённые данные — не повод ломать виджет: покажем вид по умолчанию.
+    return null;
+  }
+}
+
+/** Сохраняет вид окна. Молча ничего не делает, если хранилище недоступно. */
+export function saveAppearance(siteId: string, appearance: WidgetAppearance): void {
+  const storage = getStorage();
+  if (!storage) return;
+
+  try {
+    storage.setItem(appearanceKeyFor(siteId), JSON.stringify(appearance));
+  } catch {
+    // Переполнение квоты и подобное: вид просто применится в следующий раз.
+  }
+}
+
+function appearanceKeyFor(siteId: string): string {
+  return `ecw:${siteId}:appearance:v${FORMAT_VERSION}`;
 }

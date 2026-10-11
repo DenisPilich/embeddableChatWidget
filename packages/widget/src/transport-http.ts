@@ -1,4 +1,4 @@
-import type { ChatMessage, InitResponse, MessagesResponse } from '@ecw/shared';
+import type { ChatMessage, InitResponse, MessagesResponse, WidgetAppearance } from '@ecw/shared';
 import { loadToken, saveToken } from './storage';
 import type { DeltaHandler, MessagesHandler, OutgoingMessage, Transport } from './transport';
 
@@ -61,6 +61,8 @@ export class HttpTransport implements Transport {
   private idleHandler: (() => void) | null = null;
   /** Ждёт ли диалог оператора. Узнаём при открытии сессии. */
   private waiting = false;
+  /** Вид, заданный владельцем сайта. Узнаём при открытии сессии. */
+  private look: WidgetAppearance | null = null;
   /** Пришёл ли готовый ответ в этом потоке. Нужно, чтобы понять «ответа не будет». */
   private sawAnswer = false;
   /** Ждёт подтверждения приёма сообщения, которое завершает `send`. */
@@ -97,6 +99,10 @@ export class HttpTransport implements Transport {
     return this.waiting;
   }
 
+  get appearance(): WidgetAppearance | null {
+    return this.look;
+  }
+
   async requestHuman(): Promise<void> {
     await this.ensureSession();
 
@@ -127,6 +133,7 @@ export class HttpTransport implements Transport {
     this.token = session.token;
     saveToken(this.options.siteId, session.token);
     this.waiting = session.waitingForHuman;
+    this.look = session.appearance;
     // Отступаем на окно назад, а не встаём на последний номер: иначе то, что
     // пришло, пока страница была закрыта, не увидит никто.
     this.cursor = Math.max(0, session.lastSeq - CATCH_UP_WINDOW);

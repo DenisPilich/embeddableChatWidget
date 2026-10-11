@@ -1,4 +1,4 @@
-import type { Conversation, Message, Site, User, Visitor } from '@prisma/client';
+import type { AiConfig, Conversation, Message, Site, User, Visitor } from '@prisma/client';
 import { prisma } from './prisma';
 
 /**
@@ -491,5 +491,83 @@ export async function closeConversation(params: {
   await prisma.conversation.updateMany({
     where: { id: params.conversationId, siteId: params.siteId, status: 'OPEN' },
     data: { status: 'CLOSED', humanRequestedAt: null, answerFailures: 0 },
+  });
+}
+
+/**
+ * Сайт, доступный оператору.
+ *
+ * Как и с диалогами, граница доступа здесь одна: чужой сайт не найдётся, и
+ * вызывающему не нужно ни о чём помнить отдельно.
+ */
+export async function findOperatorSite(params: {
+  workspaceIds: readonly string[];
+  siteId: string;
+}): Promise<(Site & { aiConfig: AiConfig | null }) | null> {
+  return prisma.site.findFirst({
+    where: { id: params.siteId, workspaceId: { in: [...params.workspaceIds] } },
+    // Настройки ассистента нужны той же странице, что и сам сайт: отдельный
+    // запрос ради них означал бы, что форма может показать одно, а сохранить
+    // другое.
+    include: { aiConfig: true },
+  });
+}
+
+/** Сайты оператора вместе с настройками ассистента. */
+export async function listOperatorSites(params: {
+  workspaceIds: readonly string[];
+}): Promise<(Site & { aiConfig: AiConfig | null })[]> {
+  return prisma.site.findMany({
+    where: { workspaceId: { in: [...params.workspaceIds] } },
+    include: { aiConfig: true },
+    orderBy: { name: 'asc' },
+  });
+}
+
+/** Сохраняет настройки сайта. Доступ проверен до вызова. */
+export async function saveSiteSettings(params: {
+  siteId: string;
+  name: string;
+  allowedOrigins: string[];
+  widgetColor: string | null;
+  widgetTitle: string | null;
+  widgetGreeting: string | null;
+}): Promise<void> {
+  await prisma.site.update({
+    where: { id: params.siteId },
+    data: {
+      name: params.name,
+      allowedOrigins: params.allowedOrigins,
+      widgetColor: params.widgetColor,
+      widgetTitle: params.widgetTitle,
+      widgetGreeting: params.widgetGreeting,
+    },
+  });
+}
+
+/**
+ * Сохраняет настройки ассистента.
+ *
+ * Через `upsert`, а не `update`: у нового сайта настроек ещё нет, и владелец не
+ * должен получать ошибку за то, что первым делом открыл форму.
+ */
+export async function saveAiSettings(params: {
+  siteId: string;
+  systemPrompt: string;
+  model: string;
+  temperature: number;
+  dailyTokenBudget: number;
+}): Promise<void> {
+  const data = {
+    systemPrompt: params.systemPrompt,
+    model: params.model,
+    temperature: params.temperature,
+    dailyTokenBudget: params.dailyTokenBudget,
+  };
+
+  await prisma.aiConfig.upsert({
+    where: { siteId: params.siteId },
+    update: data,
+    create: { siteId: params.siteId, ...data },
   });
 }

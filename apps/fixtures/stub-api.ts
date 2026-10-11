@@ -21,6 +21,18 @@ import type { Connect, Plugin } from 'vite';
 /** Начало ответа двойника. По нему тесты отличают ответ от местного приветствия. */
 export const STUB_REPLY_PREFIX = 'Stub reply to';
 
+/**
+ * Вид, который двойник отдаёт как настройку сайта.
+ *
+ * Тесты берут значения отсюда, а не пишут строками: иначе проверка «вид пришёл с
+ * сервера» сломается от правки одной буквы в другом файле.
+ */
+export const STUB_APPEARANCE = {
+  color: '#0f766e',
+  title: 'Stand support',
+  greeting: 'Hi! Ask us anything about the stand.',
+};
+
 /** Пауза между кусками потока, мс. Нужна только проверкам, чтобы успеть увидеть текст. */
 const STREAM_PIECE_DELAY_MS = 40;
 
@@ -168,6 +180,9 @@ export function stubApi(): Plugin {
         conversationId: conversation.id,
         lastSeq: conversation.seq,
         waitingForHuman: conversation.waiting,
+        // Вид задаём на стенде: так проверяется, что виджет берёт его с сервера,
+        // а не показывает свои умолчания.
+        appearance: STUB_APPEARANCE,
       });
       return;
     }

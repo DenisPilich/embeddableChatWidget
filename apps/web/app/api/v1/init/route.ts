@@ -100,6 +100,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Диалог мог ждать оператора ещё с прошлого визита: посетитель должен
     // видеть это сразу, а не после первого вопроса в пустоту.
     waitingForHuman: conversation.humanRequestedAt !== null,
+    appearance: {
+      color: site.widgetColor,
+      title: site.widgetTitle,
+      greeting: site.widgetGreeting,
+    },
   };
   return jsonResponse(response, 200, origin);
 }

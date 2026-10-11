@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { listOperatorQueue } from '@/lib/data';
+import { listOperatorQueue, listOperatorSites } from '@/lib/data';
 import { formatMoment, formatWaiting } from '@/lib/format';
 import { requireOperator } from '@/lib/operator';
 import { logout } from './actions';
@@ -17,10 +17,10 @@ const QUEUE_LIMIT = 50;
 
 export default async function DashboardPage() {
   const operator = await requireOperator();
-  const queue = await listOperatorQueue({
-    workspaceIds: operator.workspaceIds,
-    limit: QUEUE_LIMIT,
-  });
+  const [queue, sites] = await Promise.all([
+    listOperatorQueue({ workspaceIds: operator.workspaceIds, limit: QUEUE_LIMIT }),
+    listOperatorSites({ workspaceIds: operator.workspaceIds }),
+  ]);
 
   const waiting = queue.filter((item) => item.humanRequestedAt !== null);
 
@@ -42,6 +42,22 @@ export default async function DashboardPage() {
           </button>
         </form>
       </header>
+
+      <section className="sites">
+        <h2 className="sites__title">Sites</h2>
+        <ul className="sites__list">
+          {sites.map((site) => (
+            <li key={site.id}>
+              <Link className="sites__link" href={`/dashboard/sites/${site.id}`}>
+                {site.name}
+              </Link>
+              <span className="queue__meta">
+                {site.aiConfig === null ? 'assistant not configured yet' : site.aiConfig.model}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       {queue.length === 0 ? (
         <p className="dash__empty">No conversations yet.</p>

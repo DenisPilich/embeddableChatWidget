@@ -96,6 +96,23 @@ test.describe('виджет на странице клиента', () => {
     await expect(page.locator('.ecw-message--ai', { hasText: STUB_REPLY_PREFIX })).toHaveCount(1);
   });
 
+  test('вид окна берётся с сервера, а не из умолчаний', async ({ page }) => {
+    await page.locator('.ecw-launcher').click();
+
+    await expect(page.locator('.ecw-header__title')).toHaveText('Stand support');
+    await expect(page.locator('.ecw-message--ai .ecw-message__bubble').first()).toHaveText(
+      'Hi! Ask us anything about the stand.',
+    );
+
+    // Цвет задан пользовательским свойством на host: оно наследуется сквозь
+    // границу Shadow DOM, поэтому переписывать стили ради настроек не пришлось.
+    const color = await page
+      .locator('[data-ecw-host]')
+      .evaluate((host) => getComputedStyle(host).getPropertyValue('--ecw-primary').trim());
+
+    expect(color).toBe('#0f766e');
+  });
+
   test('разметка в сообщении не исполняется', async ({ page }) => {
     await page.locator('.ecw-launcher').click();
 

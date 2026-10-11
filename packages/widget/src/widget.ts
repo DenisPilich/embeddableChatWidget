@@ -1,8 +1,8 @@
-import type { AuthorKind, ChatMessage } from '@ecw/shared';
+import type { AuthorKind, ChatMessage, WidgetAppearance } from '@ecw/shared';
 import { mustFind, pickMountNode } from './dom';
 import { log } from './logger';
 import { MessagesView } from './messages-view';
-import { loadHistory, saveHistory } from './storage';
+import { loadAppearance, loadHistory, saveAppearance, saveHistory } from './storage';
 import { applyStyles } from './styles';
 import type { Transport } from './transport';
 import type { InitOptions, MessageStatus, WidgetInstance, WidgetMessage } from './types';
@@ -158,6 +158,7 @@ export class ChatWidget implements WidgetInstance {
   private readonly launcher: HTMLButtonElement;
   private readonly badge: HTMLElement;
   private readonly panel: HTMLElement;
+  private readonly title: HTMLElement;
   private readonly status: HTMLElement;
   private readonly humanButton: HTMLElement;
   private readonly input: HTMLTextAreaElement;
@@ -179,6 +180,8 @@ export class ChatWidget implements WidgetInstance {
   private draft = '';
   /** Ждёт ли диалог живого оператора. Управляет подписью в шапке и кнопкой. */
   private waiting = false;
+  /** Текст приветствия. Может быть задан владельцем сайта. */
+  private greeting = GREETING;
 
   constructor(
     private readonly options: InitOptions,
@@ -205,6 +208,7 @@ export class ChatWidget implements WidgetInstance {
     shadow.append(container);
 
     this.panel = mustFind<HTMLElement>(shadow, '.ecw-panel');
+    this.title = mustFind<HTMLElement>(shadow, '.ecw-header__title');
     this.status = mustFind<HTMLElement>(shadow, '[data-ecw-status]');
     this.humanButton = mustFind<HTMLElement>(shadow, '[data-ecw-human]');
     this.launcher = mustFind<HTMLButtonElement>(shadow, '.ecw-launcher');
@@ -244,11 +248,9 @@ export class ChatWidget implements WidgetInstance {
     log(`виджет добавлен в <${mount.tagName.toLowerCase()}>`);
 
     this.restoreHistory();
-    if (this.history.length === 0) {
-      // Приветствие показываем только в пустой переписке: возвращаться к
-      // разговору с ним посреди уже начатого диалога было бы странно.
-      this.appendMessage(this.createMessage('ai', GREETING));
-    }
+    // Вид применяем сразу из кэша, не дожидаясь сессии: иначе возвращающийся
+    // посетитель видел бы, как кнопка перекрашивается после открытия страницы.
+    this.applyAppearance(loadAppearance(options.siteId));
 
     this.refreshLauncher();
     this.refreshSendState();
@@ -269,9 +271,21 @@ export class ChatWidget implements WidgetInstance {
         // Состояние ожидания известно только после открытия сессии: диалог мог
         // ждать оператора ещё с прошлого визита.
         this.setWaiting(this.transport.waitingForHuman);
+
+        const appearance = this.transport.appearance;
+        if (appearance !== null) {
+          this.applyAppearance(appearance);
+          saveAppearance(this.options.siteId, appearance);
+        }
       })
       .catch((error: unknown) => {
         console.error('[ecw] не удалось открыть сессию', error);
+      })
+      .finally(() => {
+        // Приветствие добавляем только теперь: его текст может задать владелец
+        // сайта, а приходит он вместе с сессией. Показать одно приветствие и
+        // сразу заменить его на другое — хуже, чем подождать доли секунды.
+        this.showGreetingIfEmpty();
       });
   }
 
@@ -316,6 +330,33 @@ export class ChatWidget implements WidgetInstance {
 
   isOpen(): boolean {
     return this.opened;
+  }
+
+  /** Приветствие в пустой переписке. */
+  private showGreetingIfEmpty(): void {
+    if (this.history.length > 0) return;
+
+    // Показываем только в пустой переписке: возвращаться к разговору с
+    // приветствием посреди уже начатого диалога было бы странно.
+    this.appendMessage(this.createMessage('ai', this.greeting));
+  }
+
+  /**
+   * Применяет вид, заданный владельцем сайта.
+   *
+   * Цвет задаём пользовательским свойством на host: он наследуется сквозь
+   * границу Shadow DOM, поэтому переписывать стили не нужно — и виджет остаётся
+   * одним и тем же файлом для всех сайтов.
+   */
+  private applyAppearance(appearance: WidgetAppearance | null): void {
+    if (appearance === null) return;
+
+    if (appearance.color !== null) {
+      this.host.style.setProperty('--ecw-primary', appearance.color);
+    }
+
+    if (appearance.title !== null) this.title.textContent = appearance.title;
+    if (appearance.greeting !== null) this.greeting = appearance.greeting;
   }
 
   private handleClick(event: Event): void {

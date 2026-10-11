@@ -87,6 +87,35 @@ test.describe('Панель оператора', () => {
       .toBe(true);
   });
 
+  test('владелец сохраняет настройки сайта, а чужой сайт ему недоступен', async ({
+    page,
+    request,
+  }) => {
+    const { first } = requireSites();
+    await signIn(page);
+
+    await page.goto(`${WEB}/dashboard/sites/${first.id}`);
+    await page.getByLabel('Window title').fill('Little Cloud');
+    await page.getByRole('button', { name: 'Save settings' }).click();
+
+    await expect(page.locator('.conversation__note')).toContainText('Saved');
+
+    // Значение доехало до виджета: вид приходит вместе с сессией.
+    const response = await request.post(`${apiBase}/api/v1/init`, {
+      headers: { Origin: first.allowedOrigins[0] ?? '', 'Content-Type': 'application/json' },
+      data: { siteId: first.publicKey },
+    });
+    const body = (await response.json()) as { appearance: { title: string | null } };
+    expect(body.appearance.title).toBe('Little Cloud');
+
+    // И чужой сайт недоступен — так же, как чужой диалог.
+    const foreign = readSeed()?.sites.find((site) => site.id === 'site_second_owner');
+    if (foreign !== undefined) {
+      const denied = await page.goto(`${WEB}/dashboard/sites/${foreign.id}`);
+      expect(denied?.status()).toBe(404);
+    }
+  });
+
   test('оператор не видит диалог чужого пространства', async ({ page, request }) => {
     const foreign = readSeed()?.sites.find((site) => site.id === 'site_second_owner');
     test.skip(foreign === undefined, 'в наполнении нет второго владельца');

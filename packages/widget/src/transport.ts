@@ -1,4 +1,4 @@
-import type { ChatMessage } from '@ecw/shared';
+import type { ChatMessage, WidgetAppearance } from '@ecw/shared';
 
 /**
  * Транспорт: как сообщения попадают на сервер и возвращаются обратно.
@@ -84,6 +84,12 @@ export interface Transport {
 
   /** Ждёт ли диалог оператора. Известно после `connect`. */
   readonly waitingForHuman: boolean;
+
+  /**
+   * Вид, заданный владельцем сайта, или `null`, если вид по умолчанию.
+   * Известен после `connect`.
+   */
+  readonly appearance: WidgetAppearance | null;
 
   /** Прекращает работу: останавливает опрос, закрывает соединение. */
   close(): void;

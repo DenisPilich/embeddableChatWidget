@@ -45,6 +45,16 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+/** Внешний вид виджета, заданный владельцем сайта. */
+export interface WidgetAppearance {
+  /** Основной цвет, например `#4338ca`. */
+  color: string | null;
+  /** Заголовок окна. */
+  title: string | null;
+  /** Первое сообщение в пустой переписке. */
+  greeting: string | null;
+}
+
 /** Ответ на первый запрос виджета. */
 export interface InitResponse {
   /** Подписанный токен. Виджет приносит его в заголовке Authorization. */
@@ -59,6 +69,13 @@ export interface InitResponse {
    * почему ассистент перестал отвечать.
    */
   waitingForHuman: boolean;
+  /**
+   * Внешний вид, заданный владельцем сайта.
+   *
+   * Приходит вместе с сессией, а не отдельным запросом: вид нужен сразу, и
+   * второй запрос ради цвета означал бы мигание окна при открытии.
+   */
+  appearance: WidgetAppearance;
 }
 
 /** Ответ на выборку новых сообщений. */

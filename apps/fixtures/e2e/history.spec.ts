@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { STUB_REPLY_PREFIX } from '../stub-api';
+import { STUB_APPEARANCE, STUB_REPLY_PREFIX } from '../stub-api';
 
 test.describe('переписка переживает перезагрузку', () => {
   test('сообщения восстанавливаются после перезагрузки страницы', async ({ page }) => {
@@ -25,16 +25,17 @@ test.describe('переписка переживает перезагрузку'
     // Сообщений ассистента при этом два — helloствие и ответ, — и это верно:
     // helloствие тоже часть переписки и сохраняется вместе с ней.
     await expect(
-      page.locator('.ecw-message--ai', { hasText: 'Ask about our opening hours' }),
+      page.locator('.ecw-message--ai', { hasText: STUB_APPEARANCE.greeting }),
     ).toHaveCount(1);
   });
 
-  test('в пустой переписке показывается helloствие', async ({ page }) => {
+  test('в пустой переписке показывается приветствие', async ({ page }) => {
     await page.goto('/');
 
     await expect(page.locator('.ecw-message--ai')).toHaveCount(1);
+    // Текст приветствия задаёт владелец сайта, и он приходит с сервера.
     await expect(page.locator('.ecw-message--ai .ecw-message__bubble')).toContainText(
-      'Ask about our opening hours',
+      STUB_APPEARANCE.greeting,
     );
   });
 

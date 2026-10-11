@@ -1,0 +1,74 @@
+.settings {
+  display: grid;
+  gap: 20px;
+}
+
+.settings__group {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.settings__group legend {
+  padding: 0 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.settings__field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.settings__field small {
+  color: #64748b;
+}
+
+.settings__field input,
+.settings__input {
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.settings__input {
+  resize: vertical;
+}
+
+.settings__input--tall {
+  min-height: 180px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 13px;
+}
+
+.settings__field input:focus-visible,
+.settings__input:focus-visible {
+  outline: 2px solid #4338ca;
+  outline-offset: 1px;
+}
+
+.settings__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.settings__row .settings__field {
+  flex: 1 1 160px;
+}
+
+.settings__error {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 14px;
+}

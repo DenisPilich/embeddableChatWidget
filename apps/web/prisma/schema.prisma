@@ -78,6 +78,14 @@ model Site {
   /// сообщения в базу и жечь бюджет ассистента.
   allowedOrigins String[]
 
+  /// Внешний вид виджета на этом сайте. Пусто — значит вид по умолчанию.
+  ///
+  /// Хранится у сайта, а не в коде виджета: у каждого клиента свой вид, а
+  /// пересобирать бандл из-за цвета нельзя — он у всех один и тот же.
+  widgetColor    String?
+  widgetTitle    String?
+  widgetGreeting String?
+
   workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   visitors      Visitor[]
   conversations Conversation[]

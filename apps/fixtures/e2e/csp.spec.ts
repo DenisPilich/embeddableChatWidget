@@ -44,12 +44,21 @@ test.describe('строгая Content Security Policy', () => {
   });
 
   test('оформление виджета применилось вопреки запрету встроенных стилей', async ({ page }) => {
-    // Цвет кнопки читаем ДО клика: после него курсор остаётся над кнопкой,
-    // включается состояние :hover, и мы прочитали бы не тот цвет.
+    // Цвет читаем не сразу: вид окна приходит вместе с сессией, то есть через
+    // сеть, и до этого кнопка носит цвет по умолчанию и плавно перекрашивается.
+    // Ждём установившегося значения — оно и есть цвет владельца сайта.
+    await expect
+      .poll(() =>
+        page
+          .locator('.ecw-launcher')
+          .evaluate((element) => getComputedStyle(element).backgroundColor),
+      )
+      .toBe('rgb(15, 118, 110)');
+
     const launcherColor = await page
       .locator('.ecw-launcher')
       .evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(launcherColor).toBe('rgb(67, 56, 202)');
+    expect(launcherColor).toBe('rgb(15, 118, 110)');
 
     await page.locator('.ecw-launcher').click();
 
