@@ -100,6 +100,7 @@ What the dashboard does:
 - **Queue, waiting first.** Conversations that asked for a human come first, longest wait at the top. A queue where you cannot tell whom to pick up next is a list, not a queue.
 - **Read the conversation and reply.** A reply is stored as an `agent` message and reaches the visitor the same way the assistant's answers do.
 - **Close it.** Closing clears the waiting flag; until then the assistant stays quiet, so the visitor never reads two different people answering in turn.
+- **Configure the site.** Prompt, model, daily token budget, allowed origins, and how the widget looks — colour, window title and greeting. No SQL, and the appearance reaches the widget with the session.
 
 Authorisation is one check in one place: a conversation is found only if its site belongs to a workspace the operator is a member of. Anything else is a 404 rather than a 403 — whether somebody else's conversation exists is none of your business either.
 
