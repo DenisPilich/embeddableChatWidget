@@ -2,6 +2,8 @@
 
 An embeddable chat widget: the site owner adds a single `<script>` line and gets a chat window on their page, where an LLM answers by default and a human operator joins only when needed.
 
+**Live demo:** <https://embeddable-chat-widget-deniskagods-projects.vercel.app/demo> — the customer page with the widget. The operator dashboard is at </dashboard> on the same address, sign in as `demo@example.com` / `demo-operator-2026`. How to deploy your own copy: [docs/DEPLOY.md](docs/DEPLOY.md).
+
 > **Status: the widget, the backend and the operator dashboard work end to end.** The widget is published on npm, a real model answers and streams its answer, the visitor can ask for a human, and the dashboard is where that human replies.
 
 ## Quick start
