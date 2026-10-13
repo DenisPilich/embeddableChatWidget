@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { defineConfig, env } from 'prisma/config';
+import { defineConfig } from 'prisma/config';
 
 /**
  * Настройка Prisma CLI — отдельный файл, а не блок в схеме.
@@ -8,11 +8,20 @@ import { defineConfig, env } from 'prisma/config';
  * живёт здесь. Строка подключения отсюда используется только миграциями.
  *
  * Здесь именно ПРЯМОЕ соединение, без пулера. Через пулер миграции не работают:
- * Prisma для них нужны возможности сессии, которых пулер не даёт.
+ * Prisma для них нужны возможности сессии, которых пулер не даёт. Запасной
+ * вариант — обычная строка: если прямого соединения нет, лучше попробовать
+ * имеющееся, чем упасть без объяснений.
  *
  * `dotenv/config` нужен потому, что Prisma CLI больше не читает `.env` сам.
  * Next.js читает, а CLI — нет, и без этой строки `prisma migrate` не увидит
  * переменные.
+ *
+ * Переменные читаем через `process.env`, а НЕ через `env()` из Prisma. Разница
+ * не косметическая: `env()` падает, если переменной нет, и тогда перестаёт
+ * работать даже `prisma generate` — а ему база не нужна вовсе, он только
+ * собирает клиент по схеме. Именно на этом падала сборка в Vercel: файла `.env`
+ * там нет, переменные приходят из окружения, и одного отсутствующего имени
+ * хватало, чтобы сборка остановилась.
  */
 export default defineConfig({
   schema: 'prisma/schema.prisma',
@@ -23,6 +32,6 @@ export default defineConfig({
     seed: 'tsx prisma/seed.ts',
   },
   datasource: {
-    url: env('DIRECT_URL'),
+    url: process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? '',
   },
 });
