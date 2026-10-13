@@ -39,6 +39,13 @@ test.describe('Демонстрационная страница', () => {
 
     // Ключ случайный и живёт в базе: вписанный в разметку, он сломался бы после
     // пересоздания базы.
-    await expect(page.locator('script[data-ecw-api]')).toHaveAttribute('data-site-id', /^pub_/);
+    //
+    // Берём первую метку: загрузчик создаёт вторую, для основного бандла, и
+    // переносит в неё те же data-атрибуты. Без этого проверка ловила бы то одну
+    // метку, то две — и падала бы через раз.
+    await expect(page.locator('script[data-ecw-api]').first()).toHaveAttribute(
+      'data-site-id',
+      /^pub_/,
+    );
   });
 });

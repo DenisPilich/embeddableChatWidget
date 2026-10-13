@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { isDatabaseConfigured, prisma } from '@/lib/prisma';
 
 /**
  * Проверка связи с базой.
@@ -15,6 +15,13 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 export async function GET(): Promise<NextResponse> {
+  // «Строка подключения не задана» и «база не отвечает» — разные поломки, и
+  // чинить их по-разному. Первую видно сразу и без запроса к базе.
+  if (!isDatabaseConfigured()) {
+    console.error('[ecw] проверка базы: не задана строка подключения');
+    return NextResponse.json({ ok: false, error: 'database not configured' }, { status: 503 });
+  }
+
   try {
     const rows = await prisma.$queryRaw<{ tables: number }[]>`
       select count(*)::int as tables
