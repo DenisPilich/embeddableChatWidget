@@ -393,6 +393,44 @@ export interface QueueItem {
   siteName: string;
   lastSeq: number;
   lastMessage: string | null;
+  /** Кто написал последним. Видно, нужно ли вообще открывать разговор. */
+  lastAuthor: Message['author'] | null;
+  lastAt: Date | null;
+}
+
+/** Что показывать в очереди. */
+export type QueueFilter = 'all' | 'waiting' | 'active' | 'closed';
+
+export interface ConversationCounts {
+  all: number;
+  waiting: number;
+  active: number;
+  closed: number;
+}
+
+/**
+ * Число диалогов по состояниям — для вкладок очереди.
+ *
+ * Отдельным запросом, а не подсчётом по загруженному списку: список ограничен
+ * пятьюдесятью строками, и число на вкладке разошлось бы с настоящим.
+ */
+export async function countConversationStates(params: {
+  workspaceIds: readonly string[];
+}): Promise<ConversationCounts> {
+  const scope = { site: { workspaceId: { in: [...params.workspaceIds] } } };
+
+  const [all, waiting, active, closed] = await Promise.all([
+    prisma.conversation.count({ where: scope }),
+    // «Ждёт» — это не состояние диалога, а признак на нём: диалог остаётся
+    // открытым, в нём продолжают писать.
+    prisma.conversation.count({
+      where: { ...scope, status: 'OPEN', humanRequestedAt: { not: null } },
+    }),
+    prisma.conversation.count({ where: { ...scope, status: 'OPEN', humanRequestedAt: null } }),
+    prisma.conversation.count({ where: { ...scope, status: 'CLOSED' } }),
+  ]);
+
+  return { all, waiting, active, closed };
 }
 
 /**
@@ -407,9 +445,19 @@ export interface QueueItem {
 export async function listOperatorQueue(params: {
   workspaceIds: readonly string[];
   limit: number;
+  filter?: QueueFilter;
 }): Promise<QueueItem[]> {
+  const scope = { site: { workspaceId: { in: [...params.workspaceIds] } } };
+
+  const byFilter: Record<QueueFilter, object> = {
+    all: {},
+    waiting: { status: 'OPEN', humanRequestedAt: { not: null } },
+    active: { status: 'OPEN', humanRequestedAt: null },
+    closed: { status: 'CLOSED' },
+  };
+
   const conversations = await prisma.conversation.findMany({
-    where: { site: { workspaceId: { in: [...params.workspaceIds] } } },
+    where: { ...scope, ...byFilter[params.filter ?? 'all'] },
     orderBy: [
       // Пустые значения в конце: Postgres по умолчанию ставит их в начало при
       // сортировке по убыванию, и без этого ожидающие уехали бы в хвост.
@@ -424,19 +472,29 @@ export async function listOperatorQueue(params: {
       updatedAt: true,
       lastSeq: true,
       site: { select: { name: true } },
-      messages: { orderBy: { seq: 'desc' }, take: 1, select: { body: true } },
+      messages: {
+        orderBy: { seq: 'desc' },
+        take: 1,
+        select: { body: true, author: true, createdAt: true },
+      },
     },
   });
 
-  return conversations.map((conversation) => ({
-    id: conversation.id,
-    status: conversation.status,
-    humanRequestedAt: conversation.humanRequestedAt,
-    updatedAt: conversation.updatedAt,
-    siteName: conversation.site.name,
-    lastSeq: conversation.lastSeq,
-    lastMessage: conversation.messages[0]?.body ?? null,
-  }));
+  return conversations.map((conversation) => {
+    const last = conversation.messages[0];
+
+    return {
+      id: conversation.id,
+      status: conversation.status,
+      humanRequestedAt: conversation.humanRequestedAt,
+      updatedAt: conversation.updatedAt,
+      siteName: conversation.site.name,
+      lastSeq: conversation.lastSeq,
+      lastMessage: last?.body ?? null,
+      lastAuthor: last?.author ?? null,
+      lastAt: last?.createdAt ?? null,
+    };
+  });
 }
 
 /**
@@ -491,6 +549,24 @@ export async function closeConversation(params: {
   await prisma.conversation.updateMany({
     where: { id: params.conversationId, siteId: params.siteId, status: 'OPEN' },
     data: { status: 'CLOSED', humanRequestedAt: null, answerFailures: 0 },
+  });
+}
+
+/**
+ * Возвращает закрытый диалог в работу.
+ *
+ * Нужно потому, что закрытие — действие в один клик, а последствия у него
+ * долгие: без этой команды случайно закрытый разговор остался бы в архиве
+ * навсегда. Ожидание человека при возврате НЕ выставляется: ассистент снова
+ * отвечает сам, а человека позовут заново, если понадобится.
+ */
+export async function reopenConversation(params: {
+  siteId: string;
+  conversationId: string;
+}): Promise<void> {
+  await prisma.conversation.updateMany({
+    where: { id: params.conversationId, siteId: params.siteId, status: 'CLOSED' },
+    data: { status: 'OPEN', humanRequestedAt: null, answerFailures: 0 },
   });
 }
 

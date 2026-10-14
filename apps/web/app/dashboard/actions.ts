@@ -2,7 +2,12 @@
 
 import { notFound, redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { appendAgentMessage, closeConversation, findOperatorConversation } from '@/lib/data';
+import {
+  appendAgentMessage,
+  closeConversation,
+  findOperatorConversation,
+  reopenConversation,
+} from '@/lib/data';
 import { requireOperator } from '@/lib/operator';
 import { destroyOperatorSession } from '@/lib/session';
 
@@ -59,4 +64,26 @@ export async function close(conversationId: string): Promise<void> {
 
   revalidatePath('/dashboard');
   redirect('/dashboard');
+}
+
+/**
+ * Возвращает разговор в работу.
+ *
+ * Доступ проверяется так же, как при ответе: серверное действие — обычная точка
+ * входа, и полагаться на то, что до неё дошёл только видевший страницу, нельзя.
+ */
+export async function reopen(conversationId: string): Promise<void> {
+  const operator = await requireOperator();
+
+  const conversation = await findOperatorConversation({
+    workspaceIds: operator.workspaceIds,
+    conversationId,
+  });
+  if (conversation === null) notFound();
+
+  await reopenConversation({ siteId: conversation.siteId, conversationId });
+
+  const path = `/dashboard/conversations/${conversationId}`;
+  revalidatePath(path);
+  redirect(path);
 }

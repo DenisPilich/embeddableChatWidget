@@ -132,6 +132,51 @@ test.describe('Панель оператора', () => {
     // диалога — не наше дело, и подтверждать его мы не станем.
     expect(response?.status()).toBe(404);
   });
+  test('очередь обновляется сама, без перезагрузки', async ({ page, request }) => {
+    await signIn(page);
+
+    // Разговор заводит посетитель, а не оператор: панель об этом ещё не знает.
+    const { first } = requireSites();
+    const session = await startSession(request, first);
+    await request.post(`${apiBase}/api/v1/handover`, { headers: authHeaders(session) });
+
+    await page.goto(`${WEB}/dashboard?filter=waiting`);
+
+    // Ждём появления ИМЕННО своего разговора, а не роста общего числа: проверки
+    // идут параллельно, соседние закрывают и возвращают разговоры, и общее число
+    // ожидающих от этого ходит вверх и вниз. Своя строка — не ходит.
+    await expect
+      .poll(
+        async () =>
+          page.locator(`a[href="/dashboard/conversations/${session.conversationId}"]`).count(),
+        { timeout: 30_000 },
+      )
+      .toBe(1);
+  });
+
+  test('разговор можно закрыть и вернуть обратно', async ({ page, request }) => {
+    const { first } = requireSites();
+    const session = await startSession(request, first);
+    await request.post(`${apiBase}/api/v1/handover`, { headers: authHeaders(session) });
+
+    await signIn(page);
+    await page.goto(`${WEB}/dashboard/conversations/${session.conversationId}`);
+
+    await page.getByRole('button', { name: 'Close conversation' }).click();
+
+    // Закрытый разговор уходит из очереди ожидающих и ждёт во вкладке «закрытые».
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto(`${WEB}/dashboard?filter=closed`);
+    await expect(
+      page.locator(`a[href="/dashboard/conversations/${session.conversationId}"]`),
+    ).toBeVisible();
+
+    // А это главное: закрытие обратимо. Иначе одна неверная кнопка уносила бы
+    // переписку в архив навсегда.
+    await page.goto(`${WEB}/dashboard/conversations/${session.conversationId}`);
+    await page.getByRole('button', { name: 'Reopen conversation' }).click();
+    await expect(page.getByRole('button', { name: 'Send reply' })).toBeVisible();
+  });
 });
 
 async function signIn(page: Page): Promise<void> {

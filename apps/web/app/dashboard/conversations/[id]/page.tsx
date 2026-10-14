@@ -4,7 +4,9 @@ import { notFound } from 'next/navigation';
 import { findOperatorConversation, listMessages } from '@/lib/data';
 import { formatMoment, formatWaiting } from '@/lib/format';
 import { requireOperator } from '@/lib/operator';
-import { close, reply } from '../../actions';
+import { close, reopen, reply } from '../../actions';
+import { AutoRefresh } from '../../auto-refresh';
+import { ReplyForm } from '../../reply-form';
 import '../../dashboard.css';
 
 export const metadata: Metadata = {
@@ -45,6 +47,10 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
 
   return (
     <main className="conversation">
+      {/* Оператору не нужно нажимать F5, чтобы увидеть новое сообщение: пока он
+          читает, посетитель может написать ещё. */}
+      <AutoRefresh seconds={5} />
+
       <div className="conversation__head">
         <Link className="conversation__back" href="/dashboard">
           ← All conversations
@@ -82,9 +88,24 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         </ol>
       )}
 
-      {conversation.status === 'CLOSED' ? null : (
+      {conversation.status === 'CLOSED' ? (
+        // Закрытие обратимо: разговор можно вернуть, если закрыли по ошибке.
+        // Без этого одна неверная кнопка уносила бы переписку в архив навсегда.
         <div className="reply">
-          <form className="reply" action={reply.bind(null, conversation.id)}>
+          <form action={reopen.bind(null, conversation.id)}>
+            <div className="reply__actions">
+              <button className="reply__close" type="submit">
+                Reopen conversation
+              </button>
+              <span className="reply__hint">
+                The assistant stays quiet until the visitor asks for a human again.
+              </span>
+            </div>
+          </form>
+        </div>
+      ) : (
+        <div className="reply">
+          <ReplyForm action={reply.bind(null, conversation.id)}>
             <label className="thread__author" htmlFor="reply-body">
               Reply as operator
             </label>
@@ -100,8 +121,9 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
               <button className="reply__send" type="submit">
                 Send reply
               </button>
+              <span className="reply__hint">Ctrl+Enter sends</span>
             </div>
-          </form>
+          </ReplyForm>
 
           <form action={close.bind(null, conversation.id)}>
             <div className="reply__actions">
