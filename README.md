@@ -139,7 +139,7 @@ Authorisation is one check in one place: a conversation is found only if its sit
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.1.2/dist/ecw-loader.iife.js"
+  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.2.0/dist/ecw-loader.iife.js"
   data-site-id="site_123"
   async
 ></script>
@@ -155,7 +155,7 @@ By default the widget calls the address baked in at build time. Self-hosters can
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.1.2/dist/ecw-loader.iife.js"
+  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.2.0/dist/ecw-loader.iife.js"
   data-site-id="site_123"
   data-ecw-api="https://chat.example.com"
   async
@@ -253,7 +253,7 @@ npm.cmd deprecate ecw-widget@0.1.1 "Wrong build: the bundle reports version 0.1.
 Check that customers will get a working URL:
 
 ```powershell
-$env:ECW_CDN_URL = 'https://cdn.jsdelivr.net/npm/ecw-widget@0.1.2/dist/ecw-loader.iife.js'
+$env:ECW_CDN_URL = 'https://cdn.jsdelivr.net/npm/ecw-widget@0.2.0/dist/ecw-loader.iife.js'
 pnpm.cmd --filter @ecw/fixtures test:e2e cdn
 ```
 
