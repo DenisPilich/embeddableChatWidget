@@ -459,6 +459,165 @@
   font-size: 13px;
 }
 
+/* ── Разделы и формы (доступы, пароль) ──────────────────────────────────── */
+
+.panel {
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.panel__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  font-size: 17px;
+}
+
+.panel__note {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.panel__note a {
+  color: #4338ca;
+}
+
+.members {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.members__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 14px;
+}
+
+.members__email {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.members__name {
+  color: #64748b;
+}
+
+.invite {
+  margin-top: 14px;
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
+}
+
+/* Приглашение и создание пространства — в строку: полей мало, а места хватает. */
+.form--inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: none;
+}
+
+.form__field {
+  display: grid;
+  gap: 5px;
+  font-size: 14px;
+}
+
+.form--inline .form__field {
+  flex: 1 1 200px;
+}
+
+.form__field--narrow {
+  flex: 0 1 140px;
+}
+
+.form__field input,
+.form__field select {
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font: inherit;
+  background: #fff;
+}
+
+.form__field input:focus-visible,
+.form__field select:focus-visible {
+  outline: 2px solid #4338ca;
+  outline-offset: 1px;
+}
+
+.form__submit {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #4338ca;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.form__submit:hover {
+  background: #3730a3;
+}
+
+.form__submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.form__error {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 14px;
+}
+
+/*
+  Пароль нового оператора. Показан один раз, поэтому выделен настойчиво — но не
+  цветом ошибки: это не поломка, а то, что нужно успеть скопировать.
+*/
+.form__secret {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.form__secret code {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
 /* ── Мобильная ширина ───────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {

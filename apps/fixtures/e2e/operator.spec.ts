@@ -177,6 +177,80 @@ test.describe('Панель оператора', () => {
     await page.getByRole('button', { name: 'Reopen conversation' }).click();
     await expect(page.getByRole('button', { name: 'Send reply' })).toBeVisible();
   });
+
+  test('неверный текущий пароль не меняет пароль', async ({ page }) => {
+    await signIn(page);
+    await page.goto(`${WEB}/dashboard/account`);
+
+    await page.getByLabel('Current password').fill('definitely-not-the-password');
+    await page.getByLabel('New password', { exact: true }).fill('some-new-password-123');
+    await page.getByLabel('Repeat new password').fill('some-new-password-123');
+    await page.getByRole('button', { name: 'Change password' }).click();
+
+    // Пароль не меняется — и об этом сказано прямо, а не молчанием.
+    await expect(page.locator('.form__error')).toContainText('current password is not right');
+  });
+
+  test('новое пространство с новым оператором не видит разговоров демонстрации', async ({
+    page,
+  }) => {
+    await signIn(page);
+
+    // Уникальные имена, чтобы проверки не мешали друг другу при повторных прогонах.
+    const stamp = Date.now();
+    const workspaceName = `Test workspace ${String(stamp)}`;
+    const email = `test-${String(stamp)}@example.com`;
+
+    await page.goto(`${WEB}/dashboard/access`);
+
+    // 1. Своё пространство.
+    const createPanel = page.locator('.panel', { hasText: 'New workspace' });
+    await createPanel.getByLabel('Name').fill(workspaceName);
+    await createPanel.getByRole('button', { name: 'Create workspace' }).click();
+    await expect(page.getByText(workspaceName)).toBeVisible();
+
+    // 2. Оператор в него. Пароль показывается один раз — забираем его здесь.
+    const panel = page.locator('.panel', { hasText: workspaceName });
+    await panel.getByLabel('Email').fill(email);
+    await panel.getByRole('button', { name: 'Invite' }).click();
+
+    const secret = panel.locator('.form__secret code');
+    await expect(secret).toBeVisible();
+    const password = (await secret.textContent())?.trim() ?? '';
+    expect(password.length).toBeGreaterThanOrEqual(12);
+
+    // 3. Входим под новым оператором. Ради этого всё и делалось: его очередь
+    //    пуста, потому что разговоры демонстрации лежат в другом пространстве,
+    //    и для него их не существует.
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    // Ждём именно перехода на вход: на странице доступов тоже есть поля
+    // «Email», и поиск по ним без ожидания нашёл бы несколько.
+    await expect(page).toHaveURL(/\/login/);
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill(password);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+
+    await expect(page.locator('.queue__row')).toHaveCount(0);
+    await expect(page.locator('.page__subtitle')).toContainText('Nobody is waiting');
+
+    // 4. И меняет свой пароль: старый после этого не подходит.
+    await page.goto(`${WEB}/dashboard/account`);
+    const next = `${password.slice(0, 6)}-changed-password-1`;
+
+    await page.getByLabel('Current password').fill(password);
+    await page.getByLabel('New password', { exact: true }).fill(next);
+    await page.getByLabel('Repeat new password').fill(next);
+    await page.getByRole('button', { name: 'Change password' }).click();
+    await expect(page.locator('.form__secret')).toContainText('Password changed');
+
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page).toHaveURL(/\/login/);
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill(next);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
 });
 
 async function signIn(page: Page): Promise<void> {

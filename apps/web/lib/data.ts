@@ -1,4 +1,12 @@
-import type { AiConfig, Conversation, Message, Site, User, Visitor } from '@prisma/client';
+import type {
+  AiConfig,
+  Conversation,
+  Membership,
+  Message,
+  Site,
+  User,
+  Visitor,
+} from '@prisma/client';
 import { prisma } from './prisma';
 
 /**
@@ -609,6 +617,132 @@ export async function listOperatorSites(params: {
  */
 export async function findFirstSite(): Promise<Site | null> {
   return prisma.site.findFirst({ orderBy: { createdAt: 'asc' } });
+}
+
+export interface OperatorWorkspace {
+  id: string;
+  name: string;
+  /** Роль самого оператора в этом пространстве: от неё зависит право приглашать. */
+  role: Membership['role'];
+  siteCount: number;
+  members: { userId: string; email: string; name: string | null; role: Membership['role'] }[];
+}
+
+/**
+ * Рабочие пространства оператора вместе с участниками.
+ *
+ * Это единственное место, где наружу выходят чужие адреса почты, и происходит
+ * это только для своих пространств: список ограничен членством оператора.
+ */
+export async function listOperatorWorkspaces(params: {
+  workspaceIds: readonly string[];
+  operatorId: string;
+}): Promise<OperatorWorkspace[]> {
+  const workspaces = await prisma.workspace.findMany({
+    where: { id: { in: [...params.workspaceIds] } },
+    orderBy: { name: 'asc' },
+    select: {
+      id: true,
+      name: true,
+      _count: { select: { sites: true } },
+      memberships: {
+        // Владельцы первыми: список читают, чтобы понять, к кому идти.
+        orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+        select: { role: true, userId: true, user: { select: { email: true, name: true } } },
+      },
+    },
+  });
+
+  return workspaces.map((workspace) => {
+    const mine = workspace.memberships.find((member) => member.userId === params.operatorId);
+
+    return {
+      id: workspace.id,
+      name: workspace.name,
+      // Если членства вдруг нет, считаем роль низшей: пусть лучше не хватает
+      // прав, чем наоборот.
+      role: mine?.role ?? 'AGENT',
+      siteCount: workspace._count.sites,
+      members: workspace.memberships.map((member) => ({
+        userId: member.userId,
+        email: member.user.email,
+        name: member.user.name,
+        role: member.role,
+      })),
+    };
+  });
+}
+
+/** Членство оператора в пространстве или `null`. */
+export async function findMembership(params: {
+  userId: string;
+  workspaceId: string;
+}): Promise<Membership | null> {
+  return prisma.membership.findUnique({
+    where: { userId_workspaceId: { userId: params.userId, workspaceId: params.workspaceId } },
+  });
+}
+
+/**
+ * Заводит рабочее пространство вместе с владельцем.
+ *
+ * Одним запросом, а не двумя: пространство без участников оказалось бы ничьим —
+ * его не увидел бы никто, и приглашать в него было бы некому.
+ */
+export async function createWorkspaceWithOwner(params: {
+  name: string;
+  ownerId: string;
+}): Promise<string> {
+  const workspace = await prisma.workspace.create({
+    data: {
+      name: params.name,
+      memberships: { create: { userId: params.ownerId, role: 'OWNER' } },
+    },
+    select: { id: true },
+  });
+
+  return workspace.id;
+}
+
+/** Заводит оператора с готовым хешем пароля. */
+export async function createOperator(params: {
+  email: string;
+  name: string | null;
+  passwordHash: string;
+}): Promise<User> {
+  return prisma.user.create({
+    data: {
+      // Приводим к нижнему регистру: почта — идентификатор, и «Иван@…» с
+      // «иван@…» не должны оказаться двумя разными людьми.
+      email: params.email.trim().toLowerCase(),
+      name: params.name,
+      passwordHash: params.passwordHash,
+    },
+  });
+}
+
+/** Добавляет оператора в пространство или меняет его роль там. */
+export async function addMembership(params: {
+  userId: string;
+  workspaceId: string;
+  role: Membership['role'];
+}): Promise<void> {
+  await prisma.membership.upsert({
+    where: { userId_workspaceId: { userId: params.userId, workspaceId: params.workspaceId } },
+    update: { role: params.role },
+    create: { userId: params.userId, workspaceId: params.workspaceId, role: params.role },
+  });
+}
+
+/** Меняет пароль оператора. Проверка старого пароля — на вызывающем. */
+export async function updatePassword(params: {
+  userId: string;
+  passwordHash: string;
+}): Promise<void> {
+  await prisma.user.update({
+    where: { id: params.userId },
+    data: { passwordHash: params.passwordHash },
+  });
 }
 
 /** Сохраняет настройки сайта. Доступ проверен до вызова. */

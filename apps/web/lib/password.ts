@@ -16,7 +16,26 @@ import { promisify } from 'node:util';
 const KEY_LENGTH = 64;
 const SALT_BYTES = 16;
 
+/**
+ * Наименьшая длина пароля оператора.
+ *
+ * Двенадцать символов — не украшение: панель открыта из интернета, и короткий
+ * пароль перебирается. Требование одно на весь проект, чтобы форма и действие не
+ * разошлись в том, что считать допустимым.
+ */
+export const PASSWORD_MIN_LENGTH = 12;
+
 const scryptAsync = promisify(scrypt);
+
+/**
+ * Случайный пароль для нового оператора.
+ *
+ * Показывается один раз в панели и передаётся лично. Придумывать пароль за
+ * человека нельзя: тогда владелец знал бы чужой пароль и мог бы зайти под ним.
+ */
+export function generatePassword(): string {
+  return randomBytes(18).toString('base64url');
+}
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SALT_BYTES).toString('hex');

@@ -33,14 +33,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Link className="shell__link" href="/dashboard/sites">
             Sites
           </Link>
+          <Link className="shell__link" href="/dashboard/access">
+            Access
+          </Link>
         </nav>
 
         <div className="shell__who">
           {/* Кто вошёл — видно всегда: иначе на общей машине непонятно, чьи
-              действия записываются. */}
-          <span className="shell__email" title={operator.email}>
+              действия записываются. Нажатие ведёт к смене пароля. */}
+          <Link className="shell__email" href="/dashboard/account" title={operator.email}>
             {operator.email}
-          </span>
+          </Link>
 
           <form action={logout}>
             <button className="shell__signout" type="submit">
