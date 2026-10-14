@@ -145,7 +145,7 @@ Authorisation is one check in one place: a conversation is found only if its sit
 ></script>
 ```
 
-The loader weighs 678 bytes gzipped: it waits for the customer's page to finish loading and only then pulls in the main file (7.9 KB gzipped). The widget therefore never lands on the critical path of someone else's page — and search engines rank that page by its loading metrics.
+The loader weighs 678 bytes gzipped: it waits for the customer's page to finish loading and only then pulls in the main file (9.3 KB gzipped). The widget therefore never lands on the critical path of someone else's page — and search engines rank that page by its loading metrics.
 
 **The version in the URL is mandatory.** Without it, the next package release would silently change the widget on every site it is already embedded in.
 
@@ -210,7 +210,7 @@ pnpm.cmd --filter @ecw/fixtures test:e2e ai
 
 ## Publishing
 
-The package is published: **`ecw-widget@0.1.2`**. The live URL is verified by a test — the widget really does boot from the CDN, rather than merely building locally.
+The package is published: **`ecw-widget@0.2.0`**. The live URL is verified by a test — the widget really does boot from the CDN, rather than merely building locally.
 
 **npm requires two-factor authentication to publish.** Without it the registry answers `403` with a message about 2FA and no hint that the problem is the account rather than the package. There are two workable paths:
 
