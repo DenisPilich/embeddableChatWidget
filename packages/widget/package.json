@@ -1,6 +1,6 @@
 {
   "name": "ecw-widget",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Embeddable chat widget: a 678-byte loader, Shadow DOM isolation, lazy loading",
   "license": "MIT",
   "keywords": [
