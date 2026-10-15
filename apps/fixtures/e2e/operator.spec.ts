@@ -341,6 +341,134 @@ test.describe('Панель оператора', () => {
 
     await expect(page.getByText(workspaceName)).toHaveCount(0);
   });
+
+  test('о новом разговоре сообщается, когда вкладка не в фокусе', async ({ page, request }) => {
+    test.slow();
+
+    // В headless-браузере уведомлений нет, а вкладка всегда считается видимой.
+    // Подменяем и то и другое до загрузки страницы: проверяем свою логику, а не
+    // браузер.
+    await page.addInitScript(() => {
+      const alerts: unknown[] = [];
+      (window as unknown as { __alerts: unknown[] }).__alerts = alerts;
+
+      Object.defineProperty(document, 'visibilityState', { get: () => 'hidden' });
+
+      class FakeNotification {
+        static permission = 'granted';
+        static requestPermission = (): Promise<string> => Promise.resolve('granted');
+
+        constructor(title: string, options?: unknown) {
+          alerts.push({ title, options });
+        }
+      }
+
+      (window as unknown as { Notification: unknown }).Notification = FakeNotification;
+    });
+
+    // Входим вручную, а не помощником: подписку на первый опрос нужно поставить
+    // ДО перехода в панель, иначе он успеет пройти и мы его не увидим.
+    await page.goto(`${WEB}/login`);
+    const firstPoll = page.waitForResponse((response) =>
+      response.url().includes('/api/operator/waiting'),
+    );
+    await page.getByLabel('Email').fill(OPERATOR.email);
+    await page.getByLabel('Password').fill(OPERATOR.password);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20_000 });
+
+    // Ждём именно первого опроса: он снимает базу, от которой считается рост.
+    // Без этого новый разговор мог попасть в саму базу, и роста бы не было.
+    await firstPoll;
+
+    const { first } = requireSites();
+    const session = await startSession(request, first);
+    await request.post(`${apiBase}/api/v1/handover`, { headers: authHeaders(session) });
+
+    // Опрос идёт раз в десять секунд, поэтому ждём с запасом.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => (window as unknown as { __alerts: unknown[] }).__alerts.length),
+        { timeout: 40_000 },
+      )
+      .toBeGreaterThan(0);
+  });
+
+  test('доступ восстанавливается по коду, а прежние сессии перестают работать', async ({
+    page,
+    browser,
+  }) => {
+    test.slow();
+
+    const stamp = Date.now();
+    const email = `recover-${String(stamp)}@example.com`;
+
+    // Приглашаем оператора в своё пространство и забираем оба секрета.
+    await signIn(page);
+    await page.goto(`${WEB}/dashboard/access`);
+
+    const panel = page
+      .locator('.panel')
+      .filter({ has: page.getByRole('button', { name: 'Invite' }) })
+      .first();
+    await panel.getByLabel('Email').fill(email);
+    await panel.getByRole('button', { name: 'Invite' }).click();
+
+    const passwordCode = panel.locator('.form__code--password');
+    await expect(passwordCode).toBeVisible();
+    const password = (await passwordCode.textContent())?.trim() ?? '';
+    const recoveryCode = (await panel.locator('.form__code--recovery').textContent())?.trim() ?? '';
+    expect(recoveryCode.length).toBeGreaterThan(20);
+
+    // Входим под новым оператором — этим и проверяется, что приглашение работает.
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill(password);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20_000 });
+
+    // Восстанавливаем доступ из другого окна — как это сделал бы сам человек,
+    // потерявший пароль.
+    const other = await browser.newContext();
+    const otherPage = await other.newPage();
+    const next = `${password.slice(0, 6)}-from-recovery-1`;
+
+    await otherPage.goto(`${WEB}/recover`);
+    await otherPage.getByLabel('Email').fill(email);
+    await otherPage.getByLabel('Recovery code').fill(recoveryCode);
+    await otherPage.getByLabel('New password', { exact: true }).fill(next);
+    await otherPage.getByLabel('Repeat new password').fill(next);
+    await otherPage.getByRole('button', { name: 'Set a new password' }).click();
+
+    const freshCode = otherPage.locator('.login__code--recovery');
+    await expect(freshCode).toBeVisible();
+    expect(((await freshCode.textContent()) ?? '').trim()).not.toBe(recoveryCode);
+    await other.close();
+
+    // А это главное: прежняя сессия больше не подходит. Ради этого и заведено
+    // поколение сессий — иначе восстановление оставляло бы вошедшим того, кто
+    // получил доступ.
+    await page.goto(`${WEB}/dashboard`);
+    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
+
+    // Новый пароль работает.
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill(next);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20_000 });
+
+    // Уборка: убираем приглашённого из пространства.
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
+    await signIn(page);
+    await page.goto(`${WEB}/dashboard/access`);
+
+    const row = page.locator('.members__row', { hasText: email });
+    await row.getByRole('button', { name: 'Remove' }).click();
+    await expect(page.locator('.members__row', { hasText: email })).toHaveCount(0);
+  });
 });
 
 async function signIn(page: Page): Promise<void> {

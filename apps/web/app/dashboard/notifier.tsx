@@ -54,8 +54,11 @@ export function Notifier() {
     }
 
     void check();
+    // Опрашиваем и когда вкладка свёрнута — это как раз тот случай, когда
+    // извещение нужнее всего. Свёрнутая вкладка раньше не опрашивалась, и
+    // уведомление не приходило именно тогда, ради чего оно и сделано.
     const timer = window.setInterval(() => {
-      if (document.visibilityState !== 'hidden') void check();
+      void check();
     }, POLL_SECONDS * 1000);
 
     return () => {
