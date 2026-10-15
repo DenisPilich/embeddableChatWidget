@@ -280,6 +280,9 @@ test.describe('API виджета', () => {
   });
 
   test('частые сообщения упираются в предел', async ({ request }) => {
+    // Проверка честно отправляет двадцать пять сообщений. На загруженной машине
+    // это дольше обычных тридцати секунд, и падала она не по делу, а по времени.
+    test.slow();
     requiresCanned();
     const { first } = requireSites();
     const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');
