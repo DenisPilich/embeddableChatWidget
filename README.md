@@ -132,6 +132,8 @@ What the dashboard does:
 - **Read the conversation and reply.** A reply is stored as an `agent` message and reaches the visitor the same way the assistant's answers do.
 - **Close it.** Closing clears the waiting flag; until then the assistant stays quiet, so the visitor never reads two different people answering in turn.
 - **Configure the site.** Prompt, model, daily token budget, allowed origins, and how the widget looks — colour, window title and greeting. No SQL, and the appearance reaches the widget with the session.
+- **Manage access.** Workspaces, operator invitations with a generated password, and a recovery code for every account. Codes are stored as hashes and work from `/recover`; changing or recovering a password signs out every other session.
+- **Get told.** While the dashboard is open — even in a background tab — a new waiting conversation plays a short sound and raises a desktop notification, and the waiting count sits in the tab title. Nothing is sent when the tab is closed: that would need an email service or a push subscription with VAPID keys, and this project deliberately has neither.
 
 Authorisation is one check in one place: a conversation is found only if its site belongs to a workspace the operator is a member of. Anything else is a 404 rather than a 403 — whether somebody else's conversation exists is none of your business either.
 
