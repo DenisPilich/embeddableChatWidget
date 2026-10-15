@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import type { Membership } from '@prisma/client';
 import { findUserById, listMembershipWorkspaceIds } from './data';
 import { readOperatorSession } from './session';
 
@@ -39,4 +40,16 @@ export async function requireOperator(): Promise<Operator> {
   if (operator === null) redirect('/login');
 
   return operator;
+}
+
+/**
+ * Роли, которым можно распоряжаться пространством: приглашать операторов,
+ * заводить сайты, удалять участников.
+ *
+ * Правило живёт в одном месте намеренно. Разбросанное по действиям, оно рано или
+ * поздно разойдётся: в одном месте поправят, в другом забудут, и появится дыра
+ * ровно там, где о ней не подумали.
+ */
+export function canManage(role: Membership['role']): boolean {
+  return role === 'OWNER' || role === 'ADMIN';
 }

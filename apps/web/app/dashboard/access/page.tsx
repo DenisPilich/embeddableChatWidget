@@ -4,6 +4,7 @@ import { listOperatorWorkspaces } from '@/lib/data';
 import { requireOperator } from '@/lib/operator';
 import { InviteForm } from './invite-form';
 import { WorkspaceForm } from './workspace-form';
+import { removeMember, removeWorkspace } from './actions';
 import '../dashboard.css';
 
 export const metadata: Metadata = {
@@ -24,16 +25,31 @@ const ROLE_LABEL = {
 /**
  * Доступы: рабочие пространства, их участники и приглашения.
  *
+ *
  * Страница существует ради одной задачи — разделить демонстрацию и настоящую
  * работу. Пока всё лежало в одном пространстве, публичный демо-логин открывал
  * любую переписку, и это было не украшение, а дыра.
  */
-export default async function AccessPage() {
+export default async function AccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const operator = await requireOperator();
+  const { error } = await searchParams;
   const workspaces = await listOperatorWorkspaces({
     workspaceIds: operator.workspaceIds,
     operatorId: operator.id,
   });
+
+  const refusal =
+    error === 'confirm'
+      ? 'The workspace was not deleted: the name did not match.'
+      : error === 'self'
+        ? 'You cannot remove yourself from a workspace.'
+        : error === 'lastOwner'
+          ? 'The last owner cannot be removed: there would be nobody left to manage the workspace.'
+          : null;
 
   return (
     <main className="page">
@@ -44,6 +60,12 @@ export default async function AccessPage() {
           conversations from other workspaces do not exist for them.
         </p>
       </header>
+
+      {refusal === null ? null : (
+        <p className="form__error" role="alert">
+          {refusal}
+        </p>
+      )}
 
       <section className="panel">
         <h2 className="panel__title">New workspace</h2>
@@ -71,6 +93,18 @@ export default async function AccessPage() {
                 {member.name === null ? null : <span className="members__name">{member.name}</span>}
                 <span className="badge">{ROLE_LABEL[member.role]}</span>
                 {member.userId === operator.id ? <span className="badge">you</span> : null}
+
+                {/* Себя и последнего владельца убрать нельзя: первое оставило бы
+                    человека без доступа к своему же пространству, второе — без
+                    того, кто отвечает за настройки. */}
+                {CAN_INVITE.has(workspace.role) && member.userId !== operator.id ? (
+                  <form className="members__remove" action={removeMember.bind(null, workspace.id)}>
+                    <input name="userId" type="hidden" value={member.userId} />
+                    <button className="members__button" type="submit">
+                      Remove
+                    </button>
+                  </form>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -82,6 +116,25 @@ export default async function AccessPage() {
               Only owners and admins of this workspace can invite operators.
             </p>
           )}
+
+          {workspace.role === 'OWNER' ? (
+            <details className="danger">
+              <summary className="danger__summary">Delete this workspace</summary>
+              <p className="panel__note">
+                This removes its sites, their conversations and all messages. It cannot be undone.
+                Type the workspace name to confirm.
+              </p>
+              <form className="form form--inline" action={removeWorkspace.bind(null, workspace.id)}>
+                <label className="form__field">
+                  <span>Workspace name</span>
+                  <input name="confirm" placeholder={workspace.name} required />
+                </label>
+                <button className="form__submit form__submit--danger" type="submit">
+                  Delete permanently
+                </button>
+              </form>
+            </details>
+          ) : null}
         </section>
       ))}
 

@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { listOperatorSites } from '@/lib/data';
-import { requireOperator } from '@/lib/operator';
+import { listOperatorSites, listOperatorWorkspaces } from '@/lib/data';
+import { canManage, requireOperator } from '@/lib/operator';
+import { NewSiteForm } from './new-site-form';
 import '../dashboard.css';
 
 export const metadata: Metadata = {
@@ -11,15 +12,24 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 /**
- * Список сайтов оператора.
+ * Список сайтов оператора и заведение нового.
  *
- * Раньше он был приклеен к очереди разговоров, хотя это разные вещи: очередь —
- * про людей, которые ждут ответа, а сайты — про настройки. Теперь это отдельная
- * страница, и очередь занимается только своим делом.
+ * Раньше список был приклеен к очереди разговоров, хотя это разные вещи:
+ * очередь — про людей, которые ждут ответа, а сайты — про настройки. Теперь это
+ * отдельная страница, и очередь занимается только своим делом.
  */
 export default async function SitesPage() {
   const operator = await requireOperator();
-  const sites = await listOperatorSites({ workspaceIds: operator.workspaceIds });
+  const [sites, workspaces] = await Promise.all([
+    listOperatorSites({ workspaceIds: operator.workspaceIds }),
+    listOperatorWorkspaces({ workspaceIds: operator.workspaceIds, operatorId: operator.id }),
+  ]);
+
+  // Заводить сайты может не каждый участник: список для формы ограничен теми
+  // пространствами, где прав хватает.
+  const manageable = workspaces
+    .filter((workspace) => canManage(workspace.role))
+    .map((workspace) => ({ id: workspace.id, name: workspace.name }));
 
   return (
     <main className="page">
@@ -32,10 +42,22 @@ export default async function SitesPage() {
         </p>
       </header>
 
+      {manageable.length === 0 ? null : (
+        <section className="panel">
+          <h2 className="panel__title">New site</h2>
+          <p className="panel__note">
+            A site is one embedded widget: its own key, its own assistant settings and its own
+            budget. The key is generated on the server, so two sites can never end up with the same
+            one.
+          </p>
+          <NewSiteForm workspaces={manageable} />
+        </section>
+      )}
+
       {sites.length === 0 ? (
         <p className="dash__empty">
-          A site appears here when it is created in the database. Until then the widget has nothing
-          to connect with.
+          A site appears here once you create one above. Until then the widget has nothing to
+          connect with.
         </p>
       ) : (
         <ul className="cards">

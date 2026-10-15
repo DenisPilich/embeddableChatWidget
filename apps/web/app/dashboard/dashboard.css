@@ -618,6 +618,81 @@
   overflow-wrap: anywhere;
 }
 
+.form__input {
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font: inherit;
+  resize: vertical;
+}
+
+.form__input:focus-visible {
+  outline: 2px solid #4338ca;
+  outline-offset: 1px;
+}
+
+.form__hint {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.form__submit--danger {
+  background: #b91c1c;
+}
+
+.form__submit--danger:hover {
+  background: #991b1b;
+}
+
+/* Удаление спрятано под раскрывающийся блок: это редкое и необратимое
+   действие, ему не место на виду рядом с повседневными кнопками. */
+.danger {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.danger__summary {
+  color: #b91c1c;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.members__remove {
+  margin-left: auto;
+}
+
+.members__button {
+  padding: 4px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.members__button:hover {
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+/* Готовая строка вставки: её копируют целиком, поэтому моноширинно и с
+   переносами, но без подсветки синтаксиса — лишний вес ради красоты. */
+.snippet {
+  margin: 12px 0 0;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* ── Мобильная ширина ───────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {

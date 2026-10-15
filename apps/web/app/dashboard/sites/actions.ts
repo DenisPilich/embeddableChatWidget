@@ -3,8 +3,14 @@
 import { notFound, redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { findOperatorSite, saveAiSettings, saveSiteSettings } from '@/lib/data';
-import { requireOperator } from '@/lib/operator';
+import {
+  findMembership,
+  findOperatorSite,
+  createSite,
+  saveAiSettings,
+  saveSiteSettings,
+} from '@/lib/data';
+import { canManage, requireOperator } from '@/lib/operator';
 
 /**
  * Настройки сайта из панели.
@@ -107,4 +113,65 @@ export async function saveSite(siteId: string, form: FormData): Promise<void> {
 function field(form: FormData, name: string): string {
   const value = form.get(name);
   return typeof value === 'string' ? value : '';
+}
+
+export interface AddSiteState {
+  error: string | null;
+}
+
+const addSiteSchema = z.object({
+  workspaceId: z.string().min(1),
+  name: z.string().trim().min(2).max(80),
+  origins: z
+    .string()
+    .transform((value) =>
+      value
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line !== ''),
+    )
+    .pipe(z.array(z.string().url().max(200)).max(20)),
+});
+
+/**
+ * Заводит сайт в рабочем пространстве.
+ *
+ * Без этого разделение доступов было бы неполным: пространство есть, оператор
+ * есть, а подключить к нему сайт можно было только скриптом. Ключ генерируется
+ * на сервере и показывается на странице сайта — его вставляют в разметку.
+ */
+export async function addSite(_previous: AddSiteState, form: FormData): Promise<AddSiteState> {
+  const operator = await requireOperator();
+  const workspaceId = field(form, 'workspaceId');
+
+  // Право то же, что у приглашения операторов: распоряжаться пространством может
+  // владелец или администратор.
+  const membership = await findMembership({ userId: operator.id, workspaceId });
+  if (membership === null || !canManage(membership.role)) {
+    return { error: 'You cannot add sites to this workspace.' };
+  }
+
+  const parsed = addSiteSchema.safeParse({
+    workspaceId,
+    name: field(form, 'name'),
+    origins: field(form, 'origins'),
+  });
+
+  if (!parsed.success) {
+    return {
+      error:
+        'Check the name and the origins: each origin must be a full address, like https://example.com',
+    };
+  }
+
+  const site = await createSite({
+    workspaceId: parsed.data.workspaceId,
+    name: parsed.data.name,
+    allowedOrigins: parsed.data.origins,
+  });
+
+  revalidatePath('/dashboard/sites');
+  // Сразу на страницу нового сайта: там лежит его ключ и готовая строка вставки,
+  // то есть ровно то, зачем сайт и заводили.
+  redirect(`/dashboard/sites/${site.id}`);
 }

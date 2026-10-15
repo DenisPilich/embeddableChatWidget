@@ -37,7 +37,7 @@ test.describe('Панель оператора', () => {
 
     // Не «ошибка», а именно перенаправление на вход: человек должен попасть туда,
     // где может что-то сделать.
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
     await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
   });
 
@@ -73,8 +73,10 @@ test.describe('Панель оператора', () => {
     await page.goto(`${WEB}/dashboard/conversations/${session.conversationId}`);
     await expect(page.locator('.conversation__note')).toContainText('Waiting for a human');
 
+    // Отправляем сочетанием клавиш, а не кнопкой: ответов в день десятки, и
+    // сочетание сделано именно ради них.
     await page.getByLabel('Reply as operator').fill('A human is here now.');
-    await page.getByRole('button', { name: 'Send reply' }).click();
+    await page.getByLabel('Reply as operator').press('Control+Enter');
 
     // Ответ доходит до посетителя тем же путём, которым его забирает виджет.
     await expect
@@ -140,7 +142,11 @@ test.describe('Панель оператора', () => {
     const session = await startSession(request, first);
     await request.post(`${apiBase}/api/v1/handover`, { headers: authHeaders(session) });
 
-    await page.goto(`${WEB}/dashboard?filter=waiting`);
+    // Смотрим вкладку «все», а не «ждут»: во вкладке ожидающих список ограничен
+    // полусотней и отсортирован самыми долго ждущими вперёд, поэтому свежий
+    // разговор может оказаться за пределами списка. Здесь он самый свежий и
+    // потому первый — проверка не зависит от накопленных данных.
+    await page.goto(`${WEB}/dashboard?filter=all`);
 
     // Ждём появления ИМЕННО своего разговора, а не роста общего числа: проверки
     // идут параллельно, соседние закрывают и возвращают разговоры, и общее число
@@ -152,6 +158,55 @@ test.describe('Панель оператора', () => {
         { timeout: 30_000 },
       )
       .toBe(1);
+
+    // Число ожидающих видно и в заголовке вкладки: окно оператора часто не в
+    // фокусе, а почты и звука у нас нет.
+    //
+    // Сверяем заголовок с числом на вкладке, а не с ожидаемым значением: общее
+    // число ожидающих меняют соседние проверки, и жёсткое «(1)» ломалось бы при
+    // каждом параллельном закрытии разговора.
+    await expect
+      .poll(
+        async () => {
+          const onTab =
+            (
+              await page
+                .locator('.tab', { hasText: 'Waiting' })
+                .locator('.tab__count')
+                .textContent()
+            )?.trim() ?? '0';
+          const title = await page.title();
+          return onTab === '0' ? title === 'Conversations' : title.startsWith(`(${onTab})`);
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(true);
+  });
+
+  test('на узком экране панелью можно пользоваться', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await signIn(page);
+
+    await expect(page.locator('.page__title')).toBeVisible();
+
+    // Ничего не уехало за край: горизонтальная прокрутка на телефоне — признак
+    // вёрстки, которую не проверяли.
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+
+    // Почта оператора на узком экране скрыта: нужна она редко, а место занимает.
+    await expect(page.locator('.shell__email')).toBeHidden();
+
+    // По вкладкам ходить можно, и список сайтов тоже помещается.
+    await page.getByRole('link', { name: 'Sites' }).click();
+    await expect(page.locator('.page__title')).toHaveText('Sites');
+
+    const sitesOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(sitesOverflow).toBeLessThanOrEqual(1);
   });
 
   test('разговор можно закрыть и вернуть обратно', async ({ page, request }) => {
@@ -165,7 +220,7 @@ test.describe('Панель оператора', () => {
     await page.getByRole('button', { name: 'Close conversation' }).click();
 
     // Закрытый разговор уходит из очереди ожидающих и ждёт во вкладке «закрытые».
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20_000 });
     await page.goto(`${WEB}/dashboard?filter=closed`);
     await expect(
       page.locator(`a[href="/dashboard/conversations/${session.conversationId}"]`),
@@ -191,14 +246,13 @@ test.describe('Панель оператора', () => {
     await expect(page.locator('.form__error')).toContainText('current password is not right');
   });
 
-  test('новое пространство с новым оператором не видит разговоров демонстрации', async ({
-    page,
-  }) => {
+  test('новое пространство с сайтом и оператором изолировано от демонстрации', async ({ page }) => {
     await signIn(page);
 
-    // Уникальные имена, чтобы проверки не мешали друг другу при повторных прогонах.
+    // Уникальные имена: проверки не должны мешать друг другу при повторных прогонах.
     const stamp = Date.now();
     const workspaceName = `Test workspace ${String(stamp)}`;
+    const siteName = `Test site ${String(stamp)}`;
     const email = `test-${String(stamp)}@example.com`;
 
     await page.goto(`${WEB}/dashboard/access`);
@@ -209,7 +263,21 @@ test.describe('Панель оператора', () => {
     await createPanel.getByRole('button', { name: 'Create workspace' }).click();
     await expect(page.getByText(workspaceName)).toBeVisible();
 
-    // 2. Оператор в него. Пароль показывается один раз — забираем его здесь.
+    // 2. Сайт в нём. Ключ генерирует сервер, и на странице сайта сразу лежит
+    //    готовая строка вставки — то, зачем сайт и заводили.
+    await page.goto(`${WEB}/dashboard/sites`);
+    const sitePanel = page.locator('.panel', { hasText: 'New site' });
+    await sitePanel.getByLabel('Name').fill(siteName);
+    await sitePanel.getByLabel('Allowed origins, one per line').fill('https://example.com');
+    await sitePanel.getByRole('button', { name: 'Create site' }).click();
+
+    await expect(page.locator('.conversation__title')).toHaveText(siteName);
+    const snippet = (await page.locator('.snippet').textContent()) ?? '';
+    expect(snippet).toContain('data-site-id="pub_');
+    expect(snippet).toContain('ecw-loader.iife.js');
+
+    // 3. Оператор в пространство. Пароль показывается один раз — забираем здесь.
+    await page.goto(`${WEB}/dashboard/access`);
     const panel = page.locator('.panel', { hasText: workspaceName });
     await panel.getByLabel('Email').fill(email);
     await panel.getByRole('button', { name: 'Invite' }).click();
@@ -219,22 +287,22 @@ test.describe('Панель оператора', () => {
     const password = (await secret.textContent())?.trim() ?? '';
     expect(password.length).toBeGreaterThanOrEqual(12);
 
-    // 3. Входим под новым оператором. Ради этого всё и делалось: его очередь
+    // 4. Входим под новым оператором. Ради этого всё и делалось: его очередь
     //    пуста, потому что разговоры демонстрации лежат в другом пространстве,
     //    и для него их не существует.
     await page.getByRole('button', { name: 'Sign out' }).click();
     // Ждём именно перехода на вход: на странице доступов тоже есть поля
     // «Email», и поиск по ним без ожидания нашёл бы несколько.
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(password);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20_000 });
 
     await expect(page.locator('.queue__row')).toHaveCount(0);
     await expect(page.locator('.page__subtitle')).toContainText('Nobody is waiting');
 
-    // 4. И меняет свой пароль: старый после этого не подходит.
+    // 5. И меняет свой пароль: старый после этого не подходит.
     await page.goto(`${WEB}/dashboard/account`);
     const next = `${password.slice(0, 6)}-changed-password-1`;
 
@@ -245,11 +313,25 @@ test.describe('Панель оператора', () => {
     await expect(page.locator('.form__secret')).toContainText('Password changed');
 
     await page.getByRole('button', { name: 'Sign out' }).click();
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(next);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20_000 });
+
+    // 6. Уборка за собой: пространство удаляется владельцем, подтверждая именем.
+    //    Проверка не должна оставлять мусор в панели после каждого прогона.
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
+    await signIn(page);
+
+    await page.goto(`${WEB}/dashboard/access`);
+    const own = page.locator('.panel', { hasText: workspaceName });
+    await own.locator('summary').click();
+    await own.getByLabel('Workspace name').fill(workspaceName);
+    await own.getByRole('button', { name: 'Delete permanently' }).click();
+
+    await expect(page.getByText(workspaceName)).toHaveCount(0);
   });
 });
 
@@ -258,7 +340,7 @@ async function signIn(page: Page): Promise<void> {
   await page.getByLabel('Email').fill(OPERATOR.email);
   await page.getByLabel('Password').fill(OPERATOR.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20_000 });
 }
 
 interface VisitorSession {

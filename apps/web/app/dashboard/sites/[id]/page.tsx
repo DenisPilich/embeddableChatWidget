@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { activeModel } from '@/lib/ai';
@@ -35,6 +36,25 @@ export default async function SiteSettingsPage({
   if (site === null) notFound();
 
   const ai = site.aiConfig;
+
+  // Адрес API берём из самого запроса, а не из переменной окружения: тогда
+  // строка вставки верна и на localhost, и на боевом домене, и не требует
+  // правок в двух местах при переезде.
+  const requestHeaders = await headers();
+  const host = requestHeaders.get('host') ?? 'localhost:3000';
+  const protocol = host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https';
+
+  // Версию виджета в адресе менять при каждом выпуске. Это цена за то, что
+  // виджет на чужих сайтах не меняется сам собой: без версии новая публикация
+  // подменила бы его у всех, кто уже вставил строку.
+  const loader = 'https://cdn.jsdelivr.net/npm/ecw-widget@0.2.0/dist/ecw-loader.iife.js';
+
+  const snippet = `<script
+  src="${loader}"
+  data-site-id="${site.publicKey}"
+  data-ecw-api="${protocol}://${host}"
+  async
+></script>`;
 
   return (
     <main className="conversation">
@@ -177,6 +197,20 @@ export default async function SiteSettingsPage({
           </button>
         </div>
       </form>
+
+      <section className="panel">
+        <h2 className="panel__title">Embed on the site</h2>
+        <p className="panel__note">
+          Paste this into the page. The version in the URL is mandatory: without it a future release
+          would silently change the widget on every page it is already embedded in.
+        </p>
+        <pre className="snippet">{snippet}</pre>
+        <p className="panel__note">
+          The widget only answers requests from the origins listed above. Add the site&apos;s
+          address there, or its requests will be refused with a 403 — that is what stops a copied
+          key from spending somebody else&apos;s budget.
+        </p>
+      </section>
     </main>
   );
 }

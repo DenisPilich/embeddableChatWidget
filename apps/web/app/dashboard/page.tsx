@@ -119,55 +119,67 @@ export default async function DashboardPage({
           ) : null}
         </p>
       ) : (
-        <ul className="queue">
-          {queue.map((item) => {
-            // Отдельная переменная, чтобы компилятор видел: внутри ветки
-            // значение уже не пустое.
-            const waitingSince = item.humanRequestedAt;
+        <>
+          {/* Ограничение списка должно быть видно, а не подразумеваться: очередь
+              отсортирована самыми долго ждущими вперёд, и без этой строки новый
+              разговор, не попавший в полсотню, просто исчез бы с глаз. */}
+          {queue.length >= QUEUE_LIMIT ? (
+            <p className="dash__empty">
+              Showing the first {QUEUE_LIMIT} of {counts[filter]} conversations. The longest wait
+              comes first, so close what is finished to keep the list short.
+            </p>
+          ) : null}
 
-            return (
-              <li key={item.id}>
-                <Link
-                  className={
-                    waitingSince === null ? 'queue__row' : 'queue__row queue__row--waiting'
-                  }
-                  href={`/dashboard/conversations/${item.id}`}
-                >
-                  <span className="queue__head">
-                    <span className="queue__site">{item.siteName}</span>
-                    {waitingSince === null ? null : (
-                      <span className="badge badge--waiting">
-                        waiting {formatWaiting(waitingSince)}
-                      </span>
-                    )}
-                    {item.status === 'CLOSED' ? <span className="badge">closed</span> : null}
-                  </span>
+          <ul className="queue">
+            {queue.map((item) => {
+              // Отдельная переменная, чтобы компилятор видел: внутри ветки
+              // значение уже не пустое.
+              const waitingSince = item.humanRequestedAt;
 
-                  <span className="queue__text">
-                    {item.lastMessage === null ? (
-                      <em className="queue__muted">no messages yet</em>
-                    ) : (
-                      <>
-                        {/* Кто написал последним — видно сразу: от этого зависит,
+              return (
+                <li key={item.id}>
+                  <Link
+                    className={
+                      waitingSince === null ? 'queue__row' : 'queue__row queue__row--waiting'
+                    }
+                    href={`/dashboard/conversations/${item.id}`}
+                  >
+                    <span className="queue__head">
+                      <span className="queue__site">{item.siteName}</span>
+                      {waitingSince === null ? null : (
+                        <span className="badge badge--waiting">
+                          waiting {formatWaiting(waitingSince)}
+                        </span>
+                      )}
+                      {item.status === 'CLOSED' ? <span className="badge">closed</span> : null}
+                    </span>
+
+                    <span className="queue__text">
+                      {item.lastMessage === null ? (
+                        <em className="queue__muted">no messages yet</em>
+                      ) : (
+                        <>
+                          {/* Кто написал последним — видно сразу: от этого зависит,
                             нужно ли вообще открывать разговор. */}
-                        {item.lastAuthor === null ? null : (
-                          <span className="queue__who">{AUTHOR_LABEL[item.lastAuthor]}: </span>
-                        )}
-                        {item.lastMessage}
-                      </>
-                    )}
-                  </span>
+                          {item.lastAuthor === null ? null : (
+                            <span className="queue__who">{AUTHOR_LABEL[item.lastAuthor]}: </span>
+                          )}
+                          {item.lastMessage}
+                        </>
+                      )}
+                    </span>
 
-                  <span className="queue__meta">
-                    {item.lastAt === null
-                      ? `created ${formatMoment(item.updatedAt)}`
-                      : `last message ${formatMoment(item.lastAt)}`}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+                    <span className="queue__meta">
+                      {item.lastAt === null
+                        ? `created ${formatMoment(item.updatedAt)}`
+                        : `last message ${formatMoment(item.lastAt)}`}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </main>
   );

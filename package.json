@@ -13,6 +13,7 @@
     "dev:web": "pnpm --filter @ecw/web dev",
     "db:seed": "pnpm --filter @ecw/web db:seed",
     "db:reset-demo": "pnpm --filter @ecw/web db:reset-demo",
+    "db:cleanup-tests": "pnpm --filter @ecw/web db:cleanup-tests",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",

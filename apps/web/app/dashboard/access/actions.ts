@@ -1,16 +1,21 @@
 'use server';
 
+import { notFound, redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import {
   addMembership,
+  countWorkspaceOwners,
   createOperator,
   createWorkspaceWithOwner,
+  deleteWorkspace,
   findMembership,
   findUserByEmail,
+  findWorkspace,
+  removeMembership,
 } from '@/lib/data';
 import { generatePassword, hashPassword } from '@/lib/password';
-import { requireOperator } from '@/lib/operator';
+import { canManage, requireOperator } from '@/lib/operator';
 
 /**
  * Управление доступами.
@@ -26,8 +31,8 @@ import { requireOperator } from '@/lib/operator';
 
 const ROLE = z.enum(['OWNER', 'ADMIN', 'AGENT']);
 
-/** Кто может приглашать: владелец и администратор пространства. */
-const CAN_INVITE = new Set(['OWNER', 'ADMIN']);
+/** Кто может распоряжаться пространством. Правило лежит в lib/operator.ts. */
+const CAN_MANAGE = canManage;
 
 export interface InviteState {
   /** Пароль нового оператора. Показывается один раз и только в этом ответе. */
@@ -55,7 +60,7 @@ export async function invite(
 
   // Сначала «твоё ли это пространство и хватает ли прав», потом «что ты написал».
   const membership = await findMembership({ userId: operator.id, workspaceId });
-  if (membership === null || !CAN_INVITE.has(membership.role)) {
+  if (membership === null || !CAN_MANAGE(membership.role)) {
     return { password: null, email: null, error: 'You cannot invite operators to this workspace.' };
   }
 
@@ -122,4 +127,60 @@ export async function createWorkspace(
 function field(form: FormData, name: string): string {
   const value = form.get(name);
   return typeof value === 'string' ? value : '';
+}
+
+/**
+ * Убирает оператора из пространства.
+ *
+ * Два запрета, и оба не формальность. Себя убрать нельзя: владелец, случайно
+ * лишивший себя доступа, больше не сможет ни пригласить кого-то, ни вернуть
+ * права. Последнего владельца тоже нельзя: пространство осталось бы без того,
+ * кто отвечает за настройки, и починить это можно было бы только из базы.
+ */
+export async function removeMember(workspaceId: string, form: FormData): Promise<void> {
+  const operator = await requireOperator();
+
+  const membership = await findMembership({ userId: operator.id, workspaceId });
+  if (membership === null || !CAN_MANAGE(membership.role)) notFound();
+
+  const userId = field(form, 'userId');
+  if (userId === operator.id) {
+    redirect('/dashboard/access?error=self');
+  }
+
+  const target = await findMembership({ userId, workspaceId });
+  if (target === null) {
+    revalidatePath('/dashboard/access');
+    redirect('/dashboard/access');
+  }
+
+  if (target.role === 'OWNER' && (await countWorkspaceOwners(workspaceId)) <= 1) {
+    redirect('/dashboard/access?error=lastOwner');
+  }
+
+  await removeMembership({ userId, workspaceId });
+  revalidatePath('/dashboard/access');
+  redirect('/dashboard/access');
+}
+
+/** Удаляет пространство вместе с сайтами и переписками. */
+export async function removeWorkspace(workspaceId: string, form: FormData): Promise<void> {
+  const operator = await requireOperator();
+
+  const membership = await findMembership({ userId: operator.id, workspaceId });
+  if (membership === null || membership.role !== 'OWNER') notFound();
+
+  const workspace = await findWorkspace(workspaceId);
+  if (workspace === null) notFound();
+
+  // Удаление необратимо и уносит с собой переписки, поэтому просим набрать имя
+  // пространства. Одна кнопка для такого действия — слишком мало.
+  if (field(form, 'confirm').trim() !== workspace.name) {
+    redirect('/dashboard/access?error=confirm');
+  }
+
+  await deleteWorkspace(workspaceId);
+  revalidatePath('/dashboard/access');
+  revalidatePath('/dashboard');
+  redirect('/dashboard/access');
 }

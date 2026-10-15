@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import type {
   AiConfig,
   Conversation,
@@ -6,6 +7,7 @@ import type {
   Site,
   User,
   Visitor,
+  Workspace,
 } from '@prisma/client';
 import { prisma } from './prisma';
 
@@ -743,6 +745,62 @@ export async function updatePassword(params: {
     where: { id: params.userId },
     data: { passwordHash: params.passwordHash },
   });
+}
+
+/** Пространство по идентификатору. */
+export async function findWorkspace(workspaceId: string): Promise<Workspace | null> {
+  return prisma.workspace.findUnique({ where: { id: workspaceId } });
+}
+
+/**
+ * Заводит сайт в рабочем пространстве.
+ *
+ * Ключ генерируется здесь, а не приходит из формы: он должен быть случайным.
+ * Придуманный человеком ключ рано или поздно окажется одинаковым у двух сайтов,
+ * и переписка одного польётся в другой.
+ *
+ * Настроек ассистента у нового сайта нет — и это нормально: пока владелец их не
+ * задал, работают умолчания из кода.
+ */
+export async function createSite(params: {
+  workspaceId: string;
+  name: string;
+  allowedOrigins: string[];
+}): Promise<Site> {
+  return prisma.site.create({
+    data: {
+      workspaceId: params.workspaceId,
+      name: params.name,
+      publicKey: `pub_${randomBytes(16).toString('base64url')}`,
+      allowedOrigins: [...params.allowedOrigins],
+    },
+  });
+}
+
+/** Сколько владельцев в пространстве. */
+export async function countWorkspaceOwners(workspaceId: string): Promise<number> {
+  return prisma.membership.count({ where: { workspaceId, role: 'OWNER' } });
+}
+
+/** Убирает оператора из пространства. */
+export async function removeMembership(params: {
+  userId: string;
+  workspaceId: string;
+}): Promise<void> {
+  await prisma.membership.deleteMany({
+    where: { userId: params.userId, workspaceId: params.workspaceId },
+  });
+}
+
+/**
+ * Удаляет пространство.
+ *
+ * Каскадом уходят сайты, их переписки и сообщения — то есть действие
+ * необратимое. Поэтому подтверждение в панели требует набрать имя пространства,
+ * а не нажать кнопку.
+ */
+export async function deleteWorkspace(workspaceId: string): Promise<void> {
+  await prisma.workspace.deleteMany({ where: { id: workspaceId } });
 }
 
 /** Сохраняет настройки сайта. Доступ проверен до вызова. */
