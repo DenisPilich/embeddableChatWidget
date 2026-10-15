@@ -59,6 +59,15 @@
   color: #0f172a;
 }
 
+/* Кнопка в шапке, которая выглядит как ссылка: «включить извещения» — не
+   действие, ради которого открывают панель. */
+.shell__link--button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
 .shell__who {
   display: flex;
   align-items: center;

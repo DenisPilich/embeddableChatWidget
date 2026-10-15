@@ -27,7 +27,9 @@ export async function login(form: FormData): Promise<void> {
     redirect('/login?error=1');
   }
 
-  await createOperatorSession(user.id);
+  // Поколение сессий кладём в cookie: смена и восстановление пароля его
+  // увеличивают, и выданное раньше перестаёт подходить.
+  await createOperatorSession(user.id, user.sessionVersion);
   redirect('/dashboard');
 }
 

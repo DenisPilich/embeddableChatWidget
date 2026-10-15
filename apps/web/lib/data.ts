@@ -736,14 +736,40 @@ export async function addMembership(params: {
   });
 }
 
-/** Меняет пароль оператора. Проверка старого пароля — на вызывающем. */
+/**
+ * Меняет пароль и увеличивает поколение сессий.
+ *
+ * Возвращает новое поколение: тому, кто пароль сменил сам, нужно сразу выдать
+ * свежую cookie, иначе он выгонит и себя. Все остальные входы при этом
+ * перестают работать — в этом и смысл.
+ */
 export async function updatePassword(params: {
   userId: string;
   passwordHash: string;
+}): Promise<number> {
+  const user = await prisma.user.update({
+    where: { id: params.userId },
+    data: { passwordHash: params.passwordHash, sessionVersion: { increment: 1 } },
+    select: { sessionVersion: true },
+  });
+
+  return user.sessionVersion;
+}
+
+/**
+ * Запоминает хеш кода восстановления.
+ *
+ * Хранится именно хеш: код показывается один раз владельцу учётной записи, и
+ * потеря базы не должна давать возможности сбросить чужой пароль. `null`
+ * означает, что кода нет и восстановиться по нему нельзя.
+ */
+export async function setRecoveryHash(params: {
+  userId: string;
+  recoveryHash: string | null;
 }): Promise<void> {
   await prisma.user.update({
     where: { id: params.userId },
-    data: { passwordHash: params.passwordHash },
+    data: { recoveryHash: params.recoveryHash },
   });
 }
 

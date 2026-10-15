@@ -19,12 +19,18 @@ export interface Operator {
 }
 
 export async function currentOperator(): Promise<Operator | null> {
-  const userId = await readOperatorSession();
-  if (userId === null) return null;
+  const session = await readOperatorSession();
+  if (session === null) return null;
 
-  const user = await findUserById(userId);
+  const user = await findUserById(session.userId);
   // Пользователя могли удалить, а cookie остаться.
   if (user === null) return null;
+
+  // Поколение сессий: смена и восстановление пароля его увеличивают, и всё, что
+  // было выдано раньше, перестаёт работать. Сравниваем с базой, а не верим
+  // токену: подпись наша, но поколение в токене — то, что было верно в момент
+  // выдачи, а не сейчас.
+  if (user.sessionVersion !== session.version) return null;
 
   return {
     id: user.id,

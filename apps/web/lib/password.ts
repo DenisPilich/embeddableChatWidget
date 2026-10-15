@@ -37,6 +37,17 @@ export function generatePassword(): string {
   return randomBytes(18).toString('base64url');
 }
 
+/**
+ * Код восстановления.
+ *
+ * Длиннее пароля намеренно: его не набирают руками каждый день, зато он лежит в
+ * записной книжке месяцами, и подобрать его перебором должно быть невозможно
+ * даже теоретически. Тридцать два символа — это около ста девяноста бит.
+ */
+export function generateRecoveryCode(): string {
+  return randomBytes(24).toString('base64url');
+}
+
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SALT_BYTES).toString('hex');
   const derived = (await scryptAsync(password, salt, KEY_LENGTH)) as Buffer;

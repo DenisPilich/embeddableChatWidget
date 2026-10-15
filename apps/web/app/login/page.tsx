@@ -48,6 +48,10 @@ export default async function LoginPage({
           Sign in
         </button>
       </form>
+
+      <p className="login__help">
+        Forgot the password? <a href="/recover">Recover access with a recovery code</a>.
+      </p>
     </main>
   );
 }

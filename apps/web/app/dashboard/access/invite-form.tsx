@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { invite, type InviteState } from './actions';
 
-const INITIAL: InviteState = { password: null, email: null, error: null };
+const INITIAL: InviteState = { password: null, recoveryCode: null, email: null, error: null };
 
 /**
  * Приглашение оператора.
@@ -50,10 +50,14 @@ export function InviteForm({ workspaceId }: { workspaceId: string }) {
 
       {state.password === null ? null : (
         <p className="form__secret" role="status">
-          Password for <strong>{state.email}</strong>: <code>{state.password}</code>
+          Password for <strong>{state.email}</strong>:{' '}
+          <code className="form__code form__code--password">{state.password}</code>
           <br />
-          Copy it now and pass it on in person. It is shown once and is not stored anywhere in
-          readable form.
+          Recovery code:{' '}
+          <code className="form__code form__code--recovery">{state.recoveryCode}</code>
+          <br />
+          Copy both now and pass them on in person. They are shown once, they are not stored in
+          readable form, and the recovery code is the only way back in if the password is forgotten.
         </p>
       )}
     </div>

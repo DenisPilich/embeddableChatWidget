@@ -201,6 +201,9 @@ test.describe('Панель оператора', () => {
 
     // По вкладкам ходить можно, и список сайтов тоже помещается.
     await page.getByRole('link', { name: 'Sites' }).click();
+    // Ждём адрес, а не заголовок: под нагрузкой переход успевает занять больше
+    // времени, чем обычные пять секунд ожидания, и заголовок ещё старый.
+    await expect(page).toHaveURL(/\/dashboard\/sites/, { timeout: 20_000 });
     await expect(page.locator('.page__title')).toHaveText('Sites');
 
     const sitesOverflow = await page.evaluate(
@@ -282,7 +285,9 @@ test.describe('Панель оператора', () => {
     await panel.getByLabel('Email').fill(email);
     await panel.getByRole('button', { name: 'Invite' }).click();
 
-    const secret = panel.locator('.form__secret code');
+    // Берём именно пароль: рядом лежит ещё и код восстановления, и без
+    // различия по классу поиск нашёл бы оба.
+    const secret = panel.locator('.form__code--password');
     await expect(secret).toBeVisible();
     const password = (await secret.textContent())?.trim() ?? '';
     expect(password.length).toBeGreaterThanOrEqual(12);

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { requireOperator } from '@/lib/operator';
+import { Notifier, NotifyToggle } from './notifier';
 import { logout } from './actions';
 import './dashboard.css';
 
@@ -21,6 +22,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="shell">
+      {/* Извещения живут в оболочке, а не на странице очереди: оператор чаще
+          всего сидит в переписке, и новый разговор не должен его ждать. */}
+      <Notifier />
+
       <header className="shell__bar">
         <Link className="shell__brand" href="/dashboard">
           Chat&nbsp;widget
@@ -36,6 +41,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Link className="shell__link" href="/dashboard/access">
             Access
           </Link>
+          {/* Показывается, пока браузер не спросил разрешение. */}
+          <NotifyToggle />
         </nav>
 
         <div className="shell__who">

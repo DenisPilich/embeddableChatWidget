@@ -13,8 +13,9 @@ import {
   findUserByEmail,
   findWorkspace,
   removeMembership,
+  setRecoveryHash,
 } from '@/lib/data';
-import { generatePassword, hashPassword } from '@/lib/password';
+import { generatePassword, generateRecoveryCode, hashPassword } from '@/lib/password';
 import { canManage, requireOperator } from '@/lib/operator';
 
 /**
@@ -37,6 +38,12 @@ const CAN_MANAGE = canManage;
 export interface InviteState {
   /** Пароль нового оператора. Показывается один раз и только в этом ответе. */
   password: string | null;
+  /**
+   * Код восстановления. Тоже показывается один раз и передаётся лично: с ним
+   * человек вернёт себе доступ, если забудет пароль, — и для этого не нужны ни
+   * почта, ни чужой сервис.
+   */
+  recoveryCode: string | null;
   email: string | null;
   error: string | null;
 }
@@ -61,7 +68,12 @@ export async function invite(
   // Сначала «твоё ли это пространство и хватает ли прав», потом «что ты написал».
   const membership = await findMembership({ userId: operator.id, workspaceId });
   if (membership === null || !CAN_MANAGE(membership.role)) {
-    return { password: null, email: null, error: 'You cannot invite operators to this workspace.' };
+    return {
+      password: null,
+      recoveryCode: null,
+      email: null,
+      error: 'You cannot invite operators to this workspace.',
+    };
   }
 
   const parsed = inviteSchema.safeParse({
@@ -71,7 +83,12 @@ export async function invite(
   });
 
   if (!parsed.success) {
-    return { password: null, email: null, error: 'Check the email address and the role.' };
+    return {
+      password: null,
+      recoveryCode: null,
+      email: null,
+      error: 'Check the email address and the role.',
+    };
   }
 
   const { email, name, role } = parsed.data;
@@ -79,26 +96,29 @@ export async function invite(
   const existing = await findUserByEmail(email);
   if (existing !== null) {
     // Пароль существующему не меняем: у него свой, и владелец не должен уметь
-    // зайти под чужой учётной записью.
+    // зайти под чужой учётной записью. Код восстановления тоже не трогаем — он
+    // уже есть у владельца той записи.
     await addMembership({ userId: existing.id, workspaceId, role });
     revalidatePath('/dashboard/access');
 
-    return { password: null, email, error: null };
+    return { password: null, recoveryCode: null, email, error: null };
   }
 
   const password = generatePassword();
+  const recoveryCode = generateRecoveryCode();
   const created = await createOperator({
     email,
     name,
     passwordHash: await hashPassword(password),
   });
+  await setRecoveryHash({ userId: created.id, recoveryHash: await hashPassword(recoveryCode) });
   await addMembership({ userId: created.id, workspaceId, role });
   revalidatePath('/dashboard/access');
 
-  // Пароль возвращается один раз, в ответе на это действие. Он не попадает ни в
-  // адрес, ни в базу в открытом виде, ни в журнал: перезагрузка страницы его
-  // теряет, и это правильно.
-  return { password, email, error: null };
+  // Пароль и код возвращаются один раз, в ответе на это действие. Они не
+  // попадают ни в адрес, ни в открытом виде в базу, ни в журнал: перезагрузка
+  // страницы их теряет, и это правильно.
+  return { password, recoveryCode, email, error: null };
 }
 
 const workspaceSchema = z.object({

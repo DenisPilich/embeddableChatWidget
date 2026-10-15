@@ -1,8 +1,14 @@
 'use server';
 
-import { findUserById, updatePassword } from '@/lib/data';
+import { findUserById, setRecoveryHash, updatePassword } from '@/lib/data';
 import { requireOperator } from '@/lib/operator';
-import { PASSWORD_MIN_LENGTH, hashPassword, verifyPassword } from '@/lib/password';
+import {
+  PASSWORD_MIN_LENGTH,
+  generateRecoveryCode,
+  hashPassword,
+  verifyPassword,
+} from '@/lib/password';
+import { createOperatorSession } from '@/lib/session';
 
 /**
  * Смена своего пароля.
@@ -49,9 +55,36 @@ export async function changePassword(
     return { error: 'The new password is the same as the current one.', done: false };
   }
 
-  await updatePassword({ userId: operator.id, passwordHash: await hashPassword(next) });
+  // Поколение сессий увеличивается — и своей сессии выдаём свежую сразу:
+  // иначе, сменив пароль, человек выгнал бы и себя. Все прочие входы при этом
+  // перестают работать, ради чего всё и делается.
+  const version = await updatePassword({
+    userId: operator.id,
+    passwordHash: await hashPassword(next),
+  });
+  await createOperatorSession(operator.id, version);
 
   return { error: null, done: true };
+}
+
+export interface RecoveryState {
+  /** Новый код восстановления. Показывается один раз. */
+  code: string | null;
+}
+
+/**
+ * Выдаёт новый код восстановления.
+ *
+ * Прежний перестаёт работать — иначе копия, забытая в переписке, оставалась бы
+ * ключом навсегда. Код не показывается повторно: только здесь и только раз.
+ */
+export async function rotateRecoveryCode(): Promise<RecoveryState> {
+  const operator = await requireOperator();
+
+  const code = generateRecoveryCode();
+  await setRecoveryHash({ userId: operator.id, recoveryHash: await hashPassword(code) });
+
+  return { code };
 }
 
 /** `form.get` возвращает ещё и файл: приведение через `String` дало бы `[object File]`. */

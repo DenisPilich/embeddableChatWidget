@@ -34,8 +34,8 @@ function secret(): Uint8Array {
   return new TextEncoder().encode(value);
 }
 
-export async function createOperatorSession(userId: string): Promise<void> {
-  const token = await new SignJWT({ userId })
+export async function createOperatorSession(userId: string, sessionVersion: number): Promise<void> {
+  const token = await new SignJWT({ userId, version: sessionVersion })
     .setProtectedHeader({ alg: ALGORITHM })
     .setIssuer(ISSUER)
     // Отдельная аудитория: токен виджета нельзя предъявить как сессию оператора,
@@ -55,8 +55,20 @@ export async function createOperatorSession(userId: string): Promise<void> {
   });
 }
 
-/** Идентификатор вошедшего оператора или `null`. */
-export async function readOperatorSession(): Promise<string | null> {
+/** Кто вошёл и в каком поколении: см. `sessionVersion` у пользователя. */
+export interface OperatorSession {
+  userId: string;
+  version: number;
+}
+
+/**
+ * Сессия из cookie или `null`.
+ *
+ * Кроме личности возвращаем поколение сессий: смена и восстановление пароля его
+ * увеличивают, и все выданные раньше cookie перестают подходить. Проверка самого
+ * сравнения — в `currentOperator`, потому что для неё нужна база.
+ */
+export async function readOperatorSession(): Promise<OperatorSession | null> {
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return null;
@@ -68,7 +80,13 @@ export async function readOperatorSession(): Promise<string | null> {
       audience: AUDIENCE,
     });
 
-    return typeof payload.userId === 'string' ? payload.userId : null;
+    if (typeof payload.userId !== 'string') return null;
+
+    // Cookie, выданная до появления поколений, не совпадёт ни с одним значением
+    // из базы и просто потребует войти заново. Это и нужно.
+    const version = typeof payload.version === 'number' ? payload.version : -1;
+
+    return { userId: payload.userId, version };
   } catch {
     // Просроченная или подделанная cookie — для нас просто «не вошёл».
     return null;

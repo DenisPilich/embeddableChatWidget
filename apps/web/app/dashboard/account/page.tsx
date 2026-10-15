@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { requireOperator } from '@/lib/operator';
 import { PASSWORD_MIN_LENGTH } from '@/lib/password';
 import { PasswordForm } from './password-form';
+import { RecoveryForm } from './recovery-form';
 import '../dashboard.css';
 
 export const metadata: Metadata = {
@@ -28,6 +29,17 @@ export default async function AccountPage() {
           thing.
         </p>
         <PasswordForm minLength={PASSWORD_MIN_LENGTH} />
+      </section>
+
+      <section className="panel">
+        <h2 className="panel__title">Recovery code</h2>
+        <p className="panel__note">
+          With a recovery code you can set a new password on the{' '}
+          <a href="/recover">recovery page</a> without asking anyone. Codes are stored as hashes, so
+          a lost one cannot be looked up — it can only be replaced, and the old one stops working.
+          Changing the password signs out every other session.
+        </p>
+        <RecoveryForm />
       </section>
     </main>
   );
