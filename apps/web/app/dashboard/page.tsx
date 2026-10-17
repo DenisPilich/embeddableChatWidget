@@ -4,7 +4,9 @@ import { countConversationStates, listOperatorQueue } from '@/lib/data';
 import { formatMoment, formatWaiting } from '@/lib/format';
 import { requireOperator } from '@/lib/operator';
 import { AutoRefresh } from './auto-refresh';
+import { BulkSelect } from './bulk-select';
 import { TitleCount } from './title-count';
+import { closeSelected } from './actions';
 import './dashboard.css';
 
 export const metadata: Metadata = {
@@ -55,16 +57,24 @@ const AUTHOR_LABEL = {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; q?: string }>;
 }) {
   const operator = await requireOperator();
-  const { filter: rawFilter } = await searchParams;
+  const { filter: rawFilter, q } = await searchParams;
   const filter = readFilter(rawFilter);
+  const search = q?.trim() ?? '';
 
   const [queue, counts] = await Promise.all([
-    listOperatorQueue({ workspaceIds: operator.workspaceIds, limit: QUEUE_LIMIT, filter }),
+    listOperatorQueue({ workspaceIds: operator.workspaceIds, limit: QUEUE_LIMIT, filter, search }),
     countConversationStates({ workspaceIds: operator.workspaceIds }),
   ]);
+
+  /** Ссылка на вкладку с сохранением поиска: фильтр не должен его сбрасывать. */
+  function tabHref(id: FilterId): string {
+    const params = new URLSearchParams({ filter: id });
+    if (search !== '') params.set('q', search);
+    return `/dashboard?${params.toString()}`;
+  }
 
   return (
     <main className="page">
@@ -81,31 +91,70 @@ export default async function DashboardPage({
         </p>
       </header>
 
-      <nav className="tabs" aria-label="Filter conversations">
-        {FILTERS.map((item) => {
-          const active = item.id === filter;
-
-          return (
-            <Link
-              aria-current={active ? 'page' : undefined}
-              className={active ? 'tab tab--active' : 'tab'}
-              href={`/dashboard?filter=${item.id}`}
-              key={item.id}
-            >
-              {item.label}
-              <span
-                className={
-                  item.id === 'waiting' && counts.waiting > 0
-                    ? 'tab__count tab__count--alert'
-                    : 'tab__count'
-                }
-              >
-                {counts[item.id]}
-              </span>
+      <div className="controls">
+        {/* Поиск обычной формой: работает и без JavaScript, и переживает
+            обновление страницы — условие остаётся в адресе. */}
+        <form className="search" method="get" action="/dashboard">
+          <input name="filter" type="hidden" value={filter} />
+          <input
+            aria-label="Search conversations"
+            className="search__input"
+            defaultValue={search}
+            name="q"
+            placeholder="Search by site or message…"
+            type="search"
+          />
+          <button className="search__submit" type="submit">
+            Search
+          </button>
+          {search === '' ? null : (
+            <Link className="search__clear" href={tabHref(filter)}>
+              Clear
             </Link>
-          );
-        })}
-      </nav>
+          )}
+        </form>
+
+        <nav className="tabs" aria-label="Filter conversations">
+          {FILTERS.map((item) => {
+            const active = item.id === filter;
+
+            return (
+              <Link
+                aria-current={active ? 'page' : undefined}
+                className={active ? 'tab tab--active' : 'tab'}
+                href={tabHref(item.id)}
+                key={item.id}
+              >
+                {item.label}
+                <span
+                  className={
+                    item.id === 'waiting' && counts.waiting > 0
+                      ? 'tab__count tab__count--alert'
+                      : 'tab__count'
+                  }
+                >
+                  {counts[item.id]}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+
+      {search === '' ? null : (
+        <p className="page__subtitle">
+          {queue.length === 0
+            ? `Nothing matches “${search}”.`
+            : `${String(queue.length)} matching “${search}”.`}
+        </p>
+      )}
+
+      {/* Форма массового закрытия одна на страницу: флажки в строках ссылаются
+          на неё атрибутом form, поэтому не нужно вкладывать форму в ссылку. */}
+      <form action={closeSelected} id="bulk-close">
+        <input name="filter" type="hidden" value={filter} />
+        <input name="q" type="hidden" value={search} />
+      </form>
 
       {queue.length === 0 ? (
         <p className="dash__empty">
@@ -137,7 +186,23 @@ export default async function DashboardPage({
               const waitingSince = item.humanRequestedAt;
 
               return (
-                <li key={item.id}>
+                <li className="queue__item" key={item.id}>
+                  {/* Флажок вне ссылки и связан с общей формой через form:
+                      вкладывать форму в ссылку нельзя, а без этого пришлось бы
+                      делать строку формой и терять обычный переход. */}
+                  {item.status === 'CLOSED' ? (
+                    <span className="queue__check" />
+                  ) : (
+                    <input
+                      aria-label={`Select conversation with ${item.siteName}`}
+                      className="queue__check"
+                      form="bulk-close"
+                      name="ids"
+                      type="checkbox"
+                      value={item.id}
+                    />
+                  )}
+
                   <Link
                     className={
                       waitingSince === null ? 'queue__row' : 'queue__row queue__row--waiting'
@@ -179,6 +244,9 @@ export default async function DashboardPage({
               );
             })}
           </ul>
+
+          {/* Полоса выбора: сколько отмечено и одна кнопка на всех. */}
+          <BulkSelect total={queue.filter((item) => item.status === 'OPEN').length} />
         </>
       )}
     </main>

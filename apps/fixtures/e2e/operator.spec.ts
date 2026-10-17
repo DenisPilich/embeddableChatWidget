@@ -162,25 +162,11 @@ test.describe('Панель оператора', () => {
     // Число ожидающих видно и в заголовке вкладки: окно оператора часто не в
     // фокусе, а почты и звука у нас нет.
     //
-    // Сверяем заголовок с числом на вкладке, а не с ожидаемым значением: общее
-    // число ожидающих меняют соседние проверки, и жёсткое «(1)» ломалось бы при
-    // каждом параллельном закрытии разговора.
-    await expect
-      .poll(
-        async () => {
-          const onTab =
-            (
-              await page
-                .locator('.tab', { hasText: 'Waiting' })
-                .locator('.tab__count')
-                .textContent()
-            )?.trim() ?? '0';
-          const title = await page.title();
-          return onTab === '0' ? title === 'Conversations' : title.startsWith(`(${onTab})`);
-        },
-        { timeout: 20_000 },
-      )
-      .toBe(true);
+    // Проверяем форму заголовка, а не совпадение с числом на вкладке: соседние
+    // проверки меняют общее число ожидающих, и любая точная сверка ломалась бы
+    // от их действий, а не от нашей ошибки. Форма же означает ровно одно: число
+    // в заголовке ставит наш код, а не заголовок страницы по умолчанию.
+    await expect(page).toHaveTitle(/^(\(\d+\) )?Conversations$/);
   });
 
   test('на узком экране панелью можно пользоваться', async ({ page }) => {
@@ -468,6 +454,65 @@ test.describe('Панель оператора', () => {
     const row = page.locator('.members__row', { hasText: email });
     await row.getByRole('button', { name: 'Remove' }).click();
     await expect(page.locator('.members__row', { hasText: email })).toHaveCount(0);
+  });
+
+  test('несколько разговоров закрываются одной кнопкой', async ({ page, request }) => {
+    test.slow();
+
+    // Два разговора, которые ждут человека.
+    const { first } = requireSites();
+    const one = await startSession(request, first);
+    const two = await startSession(request, first);
+    await request.post(`${apiBase}/api/v1/handover`, { headers: authHeaders(one) });
+    await request.post(`${apiBase}/api/v1/handover`, { headers: authHeaders(two) });
+
+    await signIn(page);
+    await page.goto(`${WEB}/dashboard?filter=waiting`);
+
+    // Отмечаем оба — так же, как это делает оператор, разбирая очередь.
+    await page.locator(`input[value="${one.conversationId}"]`).check();
+    await page.locator(`input[value="${two.conversationId}"]`).check();
+    await expect(page.locator('.bulk__count')).toHaveText('2 selected');
+
+    await page.getByRole('button', { name: 'Close selected' }).click();
+
+    // Оба ушли из ожидающих, а фильтр сохранился: закрыв пачку, оператор должен
+    // остаться там же, где был, а не в начале списка.
+    await expect(page).toHaveURL(/filter=waiting/, { timeout: 20_000 });
+    await expect(page.locator(`input[value="${one.conversationId}"]`)).toHaveCount(0);
+    await expect(page.locator(`input[value="${two.conversationId}"]`)).toHaveCount(0);
+  });
+
+  test('разговор находится поиском по тексту переписки', async ({ page, request }) => {
+    test.slow();
+
+    // Сообщение посетителя тянет за собой ответ модели, поэтому проверка идёт
+    // только на заготовках: живая модель тратит чужую квоту.
+    const health = await request.get(`${apiBase}/api/health/ai`);
+    const { provider } = (await health.json()) as { provider?: string };
+    test.skip(
+      provider !== 'canned',
+      'сервер запущен с живой моделью, а проверка идёт на заготовках',
+    );
+    if (provider !== 'canned') return;
+
+    const { first } = requireSites();
+    const session = await startSession(request, first);
+    const marker = `needle${String(Date.now())}`;
+
+    await request.post(`${apiBase}/api/v1/messages`, {
+      headers: { ...authHeaders(session), 'Content-Type': 'application/json' },
+      data: { clientId: marker, body: `question about ${marker}` },
+    });
+
+    await signIn(page);
+    await page.goto(`${WEB}/dashboard?filter=all&q=${marker}`);
+
+    // Поиск идёт по базе, а не по загруженной полусотне: иначе находка зависела
+    // бы от того, попал ли разговор в список.
+    await expect(
+      page.locator(`a[href="/dashboard/conversations/${session.conversationId}"]`),
+    ).toHaveCount(1);
   });
 });
 

@@ -456,6 +456,8 @@ export async function listOperatorQueue(params: {
   workspaceIds: readonly string[];
   limit: number;
   filter?: QueueFilter;
+  /** Поиск по имени сайта и по тексту переписки. */
+  search?: string;
 }): Promise<QueueItem[]> {
   const scope = { site: { workspaceId: { in: [...params.workspaceIds] } } };
 
@@ -466,8 +468,21 @@ export async function listOperatorQueue(params: {
     closed: { status: 'CLOSED' },
   };
 
+  const search = params.search?.trim() ?? '';
+  // Поиск идёт по базе, а не по загруженной полусотне: иначе находка зависела бы
+  // от того, попал ли разговор в список, — а именно этого оператор и не видит.
+  const bySearch =
+    search === ''
+      ? {}
+      : {
+          OR: [
+            { site: { name: { contains: search, mode: 'insensitive' as const } } },
+            { messages: { some: { body: { contains: search, mode: 'insensitive' as const } } } },
+          ],
+        };
+
   const conversations = await prisma.conversation.findMany({
-    where: { ...scope, ...byFilter[params.filter ?? 'all'] },
+    where: { ...scope, ...byFilter[params.filter ?? 'all'], ...bySearch },
     orderBy: [
       // Пустые значения в конце: Postgres по умолчанию ставит их в начало при
       // сортировке по убыванию, и без этого ожидающие уехали бы в хвост.
@@ -578,6 +593,34 @@ export async function reopenConversation(params: {
     where: { id: params.conversationId, siteId: params.siteId, status: 'CLOSED' },
     data: { status: 'OPEN', humanRequestedAt: null, answerFailures: 0 },
   });
+}
+
+/**
+ * Закрывает несколько диалогов сразу.
+ *
+ * Один запрос на все: закрывать по одному — это столько же походов в базу,
+ * сколько диалогов, и оператор, разбирающий очередь после выходных, ждал бы
+ * впустую. Возвращает, сколько действительно закрылось.
+ *
+ * Условия те же, что везде: чужие диалоги не закроются, даже если их
+ * идентификаторы прислали в форме, а уже закрытые не считаются второй раз.
+ */
+export async function closeConversations(params: {
+  workspaceIds: readonly string[];
+  ids: readonly string[];
+}): Promise<number> {
+  if (params.ids.length === 0) return 0;
+
+  const updated = await prisma.conversation.updateMany({
+    where: {
+      id: { in: [...params.ids] },
+      site: { workspaceId: { in: [...params.workspaceIds] } },
+      status: 'OPEN',
+    },
+    data: { status: 'CLOSED', humanRequestedAt: null, answerFailures: 0 },
+  });
+
+  return updated.count;
 }
 
 /**

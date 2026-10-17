@@ -138,13 +138,60 @@
   color: #4338ca;
 }
 
-/* ── Вкладки ────────────────────────────────────────────────────────────── */
+/* ── Вкладки и поиск ────────────────────────────────────────────────────── */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 16px;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search__input {
+  min-width: 240px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 14px;
+  background: #fff;
+}
+
+.search__input:focus-visible {
+  outline: 2px solid #4338ca;
+  outline-offset: 1px;
+}
+
+.search__submit,
+.search__clear {
+  padding: 7px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.search__submit:hover,
+.search__clear:hover {
+  border-color: #c7d2fe;
+}
 
 .tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 16px;
+  margin: 0;
 }
 
 .tab {
@@ -202,6 +249,99 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* Строка очереди: флажок слева, карточка справа. Флажок вне ссылки, но
+   выровнен по её верху — чтобы выбор читался как часть строки, а не как
+   отдельный элемент рядом. */
+.queue__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.queue__item .queue__row {
+  flex: 1;
+  min-width: 0;
+}
+
+.queue__check {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 18px;
+  accent-color: #4338ca;
+  cursor: pointer;
+}
+
+/* Полоса выбора — липкая снизу: отметить несколько в длинном списке и не
+   потерять кнопку. */
+.bulk {
+  position: sticky;
+  bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(6px);
+}
+
+.bulk__select {
+  display: flex;
+  gap: 12px;
+}
+
+.bulk__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #4338ca;
+  font: inherit;
+  font-size: 14px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.bulk__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bulk__bar--idle {
+  opacity: 0.7;
+}
+
+.bulk__count {
+  color: #475569;
+  font-size: 14px;
+}
+
+.bulk__submit {
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #4338ca;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bulk__submit:hover {
+  background: #3730a3;
+}
+
+.bulk__submit:disabled {
+  background: #cbd5e1;
+  cursor: default;
 }
 
 .queue__row {

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import {
   appendAgentMessage,
   closeConversation,
+  closeConversations,
   findOperatorConversation,
   reopenConversation,
 } from '@/lib/data';
@@ -86,4 +87,40 @@ export async function reopen(conversationId: string): Promise<void> {
   const path = `/dashboard/conversations/${conversationId}`;
   revalidatePath(path);
   redirect(path);
+}
+
+/**
+ * Закрывает несколько разговоров сразу — то, что оператор делает после выходных.
+ *
+ * Идентификаторы приходят из формы, то есть им нельзя верить: фильтр по рабочим
+ * пространствам стоит в самом запросе к базе, и чужие разговоры не закроются,
+ * даже если их подставили руками.
+ *
+ * Возвращаемся туда же, откуда пришли — с тем же фильтром и поиском. Иначе,
+ * закрыв пачку, оператор каждый раз оказывался бы в начале списка.
+ */
+export async function closeSelected(form: FormData): Promise<void> {
+  const operator = await requireOperator();
+
+  const ids = form
+    .getAll('ids')
+    .map((value) => (typeof value === 'string' ? value : ''))
+    .filter((value) => value !== '');
+
+  await closeConversations({ workspaceIds: operator.workspaceIds, ids });
+
+  const filter = field(form, 'filter');
+  const search = field(form, 'q');
+  const params = new URLSearchParams();
+  if (filter !== '') params.set('filter', filter);
+  if (search !== '') params.set('q', search);
+
+  revalidatePath('/dashboard');
+  redirect(params.size === 0 ? '/dashboard' : `/dashboard?${params.toString()}`);
+}
+
+/** `form.get` возвращает ещё и файл: приведение через `String` дало бы `[object File]`. */
+function field(form: FormData, name: string): string {
+  const value = form.get(name);
+  return typeof value === 'string' ? value : '';
 }
