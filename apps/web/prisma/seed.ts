@@ -48,12 +48,19 @@ interface SiteSeed {
   id: string;
   name: string;
   allowedOrigins: string[];
+  /** Основной цвет виджета. Пусто — вид по умолчанию. */
+  widgetColor?: string;
+  /** Заголовок окна. Пусто — «Chat». */
+  widgetTitle?: string;
 }
 
 const SITES: readonly SiteSeed[] = [
   {
     id: 'site_local_stand',
     name: 'Stand "Little Cloud Coffee"',
+    // Янтарный — под тёмную демонстрационную страницу: виджет на ней должен
+    // выглядеть частью сайта, а не фиолетовым кружком из другой вселенной.
+    widgetColor: '#f59e0b',
     // Три адреса: стенд, он же по 127.0.0.1, и демонстрационная страница внутри
     // самого приложения. Все три — источники, с которых виджет ходит в API;
     // список источников для боевого адреса владелец добавит в панели.
@@ -156,8 +163,14 @@ async function main(): Promise<void> {
       ? await prisma.site.update({
           where: { id: seed.id },
           // Источники и имя обновляем при каждом запуске: если стенд переехал на
-          // другой порт, сид — то место, где это правится.
-          data: { name: seed.name, allowedOrigins: [...seed.allowedOrigins] },
+          // другой порт, сид — то место, где это правится. Цвет виджета тоже:
+          // наполнение — источник правды для данных разработки.
+          data: {
+            name: seed.name,
+            allowedOrigins: [...seed.allowedOrigins],
+            widgetColor: seed.widgetColor ?? null,
+            widgetTitle: seed.widgetTitle ?? null,
+          },
         })
       : await prisma.site.create({
           data: {
@@ -167,6 +180,8 @@ async function main(): Promise<void> {
             // Случайный ключ, как в бою. Секретом не является — он виден в HTML.
             publicKey: `pub_${randomBytes(16).toString('base64url')}`,
             allowedOrigins: [...seed.allowedOrigins],
+            widgetColor: seed.widgetColor ?? null,
+            widgetTitle: seed.widgetTitle ?? null,
           },
         });
 
