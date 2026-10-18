@@ -48,4 +48,19 @@ test.describe('Демонстрационная страница', () => {
       /^pub_/,
     );
   });
+
+  test('на адресе предпросмотра страница говорит, где чат живой', async ({ page }) => {
+    await page.goto(`${WEB}/demo`);
+
+    // В проверках VERCEL_PROJECT_PRODUCTION_URL задан нарочно (см.
+    // playwright.config.ts): на боевом Vercel эту переменную кладёт сам Vercel,
+    // и предупреждение появляется на любом адресе сборки. Без него посетитель
+    // видел бы молча сломанный чат — «не отправлено» и ни слова о причине.
+    const notice = page.locator('.notice');
+    await expect(notice).toBeVisible();
+    await expect(notice.getByRole('link')).toHaveAttribute(
+      'href',
+      'https://portfolio.example/demo',
+    );
+  });
 });

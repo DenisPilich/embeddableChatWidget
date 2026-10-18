@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { PreviewNotice } from './preview-notice';
 import './theme.css';
 
 /**
@@ -21,6 +22,8 @@ export default function HomePage() {
     <main className="stage">
       <div aria-hidden className="stage__glow" />
       <div aria-hidden className="stage__dust" />
+
+      <PreviewNotice path="/" />
 
       <div className="stage__inner">
         <header className="bar">

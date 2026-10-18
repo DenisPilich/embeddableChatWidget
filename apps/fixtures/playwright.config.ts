@@ -79,7 +79,15 @@ export default defineConfig({
             //
             // Настоящая модель проверяется отдельно — e2e/ai.spec.ts, и тоже
             // только когда ключ есть.
-            env: { ECW_AI_PROVIDER: 'canned' },
+            //
+            // VERCEL_PROJECT_PRODUCTION_URL подставлен нарочно: на нём держится
+            // проверка предупреждения о предпросмотре. На боевом Vercel эту
+            // переменную кладёт сам Vercel, локально её нет — и предупреждения
+            // нет, разработке оно не нужно.
+            env: {
+              ECW_AI_PROVIDER: 'canned',
+              VERCEL_PROJECT_PRODUCTION_URL: 'portfolio.example',
+            },
           },
         ]
       : []),

@@ -361,6 +361,36 @@ body {
   font-size: 13px;
 }
 
+/* ── Предупреждение о предпросмотре ─────────────────────────────────────── */
+
+/* Заметное, но не кричащее: это не ошибка человека, а подсказка, где чат жив. */
+.notice {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 11px 24px;
+  background: rgba(245, 158, 11, 0.14);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fde68a;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.notice__link {
+  color: var(--amber-bright);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.notice__link:hover {
+  text-decoration: underline;
+}
+
 .stage__error {
   margin: 0;
   padding: 14px 18px;

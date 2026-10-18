@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { findFirstSite } from '@/lib/data';
+import { PreviewNotice } from '../preview-notice';
 import { OpenChatButton } from './open-chat-button';
 import '../theme.css';
 import './demo.css';
@@ -35,6 +36,10 @@ export default async function DemoPage() {
             тянуть мегабайты ради настроения. */}
         <div aria-hidden className="stage__glow" />
         <div aria-hidden className="stage__dust" />
+
+        {/* Открыли адрес предпросмотра — говорим об этом прямо, а не ждём, пока
+            человек решит, что чат сломан. */}
+        <PreviewNotice path="/demo" />
 
         <div className="stage__inner">
           <header className="bar">
