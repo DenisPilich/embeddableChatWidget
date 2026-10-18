@@ -122,6 +122,24 @@ test.describe('API виджета', () => {
     });
   });
 
+  test('свой адрес приложения принимается без записи в список источников', async ({ request }) => {
+    const { first } = requireSites();
+
+    // Обращаемся по 127.0.0.1 и с таким же источником. В списке источников сайта
+    // такого адреса нет — там localhost:3000. Приложение обязано принимать запрос
+    // со своего же адреса: демонстрационная страница живёт здесь же и не должна
+    // вписывать себя руками. Именно на этом ломался виджет на адресах
+    // предпросмотра: 403 на /api/v1/init и «не отправлено» на странице.
+    const ownBase = apiBase.replace('localhost', '127.0.0.1');
+
+    const response = await request.post(`${ownBase}/api/v1/init`, {
+      headers: { Origin: ownBase, 'Content-Type': 'application/json' },
+      data: { siteId: first.publicKey },
+    });
+
+    expect(response.status()).toBe(200);
+  });
+
   test('ключ второго сайта с домена первого не работает', async ({ request }) => {
     const { first, second } = requireSites();
 

@@ -41,10 +41,49 @@ export function normalizeOrigin(value: string | null): string | null {
   }
 }
 
-/** Разрешён ли источник для сайта. */
-export function isOriginAllowed(origin: string | null, allowedOrigins: readonly string[]): boolean {
+/**
+ * Разрешён ли источник.
+ *
+ * Кроме списка сайта разрешается запрос с того же адреса, на котором работает
+ * само приложение. Это не лазейка: для браузера такие запросы свои, CORS к ним
+ * не применяется вовсе, а чужой сайт под этот адрес не подделается — его
+ * источник будет другим, и он упрётся в список.
+ *
+ * Зачем это нужно. Демонстрационная страница живёт на том же домене, что и API,
+ * и раньше была обязана вписывать себя в список руками. Каждый новый адрес
+ * предпросмотра на Vercel (а их у деплоя много) ломал виджет, и выглядело это
+ * как «не отправлено» без единого намёка на причину: `/api/v1/init` отвечал 403,
+ * а на странице не менялось ничего.
+ */
+export function isOriginAllowed(
+  origin: string | null,
+  allowedOrigins: readonly string[],
+  ownOrigin?: string | null,
+): boolean {
   const normalized = normalizeOrigin(origin);
   if (!normalized) return false;
 
+  // Свой адрес — всегда разрешён.
+  if (ownOrigin !== undefined && ownOrigin !== null && normalizeOrigin(ownOrigin) === normalized) {
+    return true;
+  }
+
   return allowedOrigins.some((allowed) => normalizeOrigin(allowed) === normalized);
+}
+
+/**
+ * Адрес, на котором приложение отвечает на этот запрос.
+ *
+ * За прокси Vercel настоящий хост приходит в `x-forwarded-host`, а схема — в
+ * `x-forwarded-proto`: `request.url` внутри функции описывает внутренний адрес,
+ * и сравнивать источник с ним бессмысленно.
+ */
+export function ownOrigin(request: Request): string | null {
+  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host');
+  if (!host) return null;
+
+  const proto =
+    request.headers.get('x-forwarded-proto') ?? new URL(request.url).protocol.replace(':', '');
+
+  return `${proto}://${host}`;
 }

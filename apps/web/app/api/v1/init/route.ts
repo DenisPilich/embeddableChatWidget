@@ -1,7 +1,7 @@
 import type { InitResponse } from '@ecw/shared';
 import type { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { isOriginAllowed } from '@/lib/cors';
+import { isOriginAllowed, ownOrigin } from '@/lib/cors';
 import { findSiteByPublicKey, resolveOpenConversation, resolveVisitor } from '@/lib/data';
 import {
   errorResponse,
@@ -61,7 +61,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return errorResponse('unknown_site', 404, origin);
   }
 
-  if (!isOriginAllowed(origin, site.allowedOrigins)) {
+  if (!isOriginAllowed(origin, site.allowedOrigins, ownOrigin(request))) {
     console.warn('[ecw] отклонён запрос с постороннего источника', {
       origin: origin || '(пусто)',
       siteId: site.id,
