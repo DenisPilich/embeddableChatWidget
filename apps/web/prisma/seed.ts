@@ -61,6 +61,7 @@ const SITES: readonly SiteSeed[] = [
     // Янтарный — под тёмную демонстрационную страницу: виджет на ней должен
     // выглядеть частью сайта, а не фиолетовым кружком из другой вселенной.
     widgetColor: '#f59e0b',
+    widgetTitle: 'Little Cloud',
     // Три адреса: стенд, он же по 127.0.0.1, и демонстрационная страница внутри
     // самого приложения. Все три — источники, с которых виджет ходит в API;
     // список источников для боевого адреса владелец добавит в панели.
@@ -159,18 +160,25 @@ async function main(): Promise<void> {
   for (const seed of SITES) {
     const existing = await prisma.site.findUnique({ where: { id: seed.id } });
 
+    // Источники ОБЪЕДИНЯЕМ с уже разрешёнными, а не заменяем.
+    //
+    // Наполнение знает про локальные стенды, но не про боевые домены — а база
+    // одна на всё. Первая версия заменяла список, и после запуска сида деплой
+    // перестал получать сессию: `/api/v1/init` отвечал 403, а виджет на живой
+    // странице показывал «не отправлено». Ошибка была не в виджете.
+    const origins = new Set([...(existing?.allowedOrigins ?? []), ...seed.allowedOrigins]);
+
+    // Вид правим, только если он задан в наполнении. Незаданное поле не значит
+    // «сбросить»: иначе запуск сида стирал бы то, что владелец выбрал в панели.
+    const look = {
+      ...(seed.widgetColor === undefined ? {} : { widgetColor: seed.widgetColor }),
+      ...(seed.widgetTitle === undefined ? {} : { widgetTitle: seed.widgetTitle }),
+    };
+
     const site = existing
       ? await prisma.site.update({
           where: { id: seed.id },
-          // Источники и имя обновляем при каждом запуске: если стенд переехал на
-          // другой порт, сид — то место, где это правится. Цвет виджета тоже:
-          // наполнение — источник правды для данных разработки.
-          data: {
-            name: seed.name,
-            allowedOrigins: [...seed.allowedOrigins],
-            widgetColor: seed.widgetColor ?? null,
-            widgetTitle: seed.widgetTitle ?? null,
-          },
+          data: { name: seed.name, allowedOrigins: [...origins], ...look },
         })
       : await prisma.site.create({
           data: {
@@ -179,9 +187,8 @@ async function main(): Promise<void> {
             name: seed.name,
             // Случайный ключ, как в бою. Секретом не является — он виден в HTML.
             publicKey: `pub_${randomBytes(16).toString('base64url')}`,
-            allowedOrigins: [...seed.allowedOrigins],
-            widgetColor: seed.widgetColor ?? null,
-            widgetTitle: seed.widgetTitle ?? null,
+            allowedOrigins: [...origins],
+            ...look,
           },
         });
 
