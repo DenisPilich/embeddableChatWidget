@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { findFirstSite } from '@/lib/data';
 import { OpenChatButton } from './open-chat-button';
+import '../theme.css';
 import './demo.css';
 
 /**

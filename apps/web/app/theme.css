@@ -1,0 +1,395 @@
+/*
+  Общая визуальная основа тёмных страниц проекта.
+
+  Сюда вынесено всё, что одинаково у демонстрационной страницы и у корневой:
+  фон, свечение, пыль, шапка, панели, кнопки. Два экрана рисуются одним набором
+  правил — иначе они разъезжаются через неделю, и «наш стиль» превращается в два
+  разных стиля.
+
+  Ни одной картинки и ни одного внешнего шрифта: настроение собрано из
+  градиентов и размытия, и стоит это килобайты, а не мегабайты.
+*/
+
+html,
+body {
+  margin: 0;
+  background: #05070f;
+}
+
+.stage {
+  --amber: #f59e0b;
+  --amber-bright: #fbbf24;
+  --night: #070a14;
+
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% -10%, #182046 0%, transparent 60%),
+    linear-gradient(180deg, var(--night) 0%, #090c1a 55%, #05070f 100%);
+  color: #e8eaf6;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
+/* Свечение: два больших пятна, размытых до состояния тумана. */
+.stage__glow {
+  position: absolute;
+  inset: -20% -10% auto -10%;
+  height: 90vh;
+  background:
+    radial-gradient(28% 40% at 22% 30%, rgba(245, 158, 11, 0.22), transparent 70%),
+    radial-gradient(32% 44% at 78% 22%, rgba(99, 102, 241, 0.24), transparent 72%);
+  filter: blur(40px);
+  pointer-events: none;
+  animation: breathe 14s ease-in-out infinite alternate;
+}
+
+@keyframes breathe {
+  from {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+/* Пыль: повторяющийся узор из точек, почти незаметный. */
+.stage__dust {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px);
+  background-size: 96px 96px;
+  mask-image: radial-gradient(120% 70% at 50% 0%, #000 20%, transparent 75%);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.stage__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px 72px;
+}
+
+/* ── Шапка ──────────────────────────────────────────────────────────────── */
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin: 0 -24px 48px;
+  padding: 14px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(7, 10, 20, 0.7);
+  backdrop-filter: blur(12px);
+}
+
+.bar__brand {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.bar__nav {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.bar__link {
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: #a9b0d0;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.bar__link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.bar__cta {
+  margin-left: auto;
+  padding: 8px 16px;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--amber-bright);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.bar__cta:hover {
+  background: rgba(245, 158, 11, 0.22);
+}
+
+/* ── Первый экран ───────────────────────────────────────────────────────── */
+
+.hero {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  align-items: start;
+  gap: 48px;
+  margin-bottom: 64px;
+}
+
+.kicker {
+  margin: 0 0 14px;
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hero__title {
+  margin: 0 0 20px;
+  font-size: clamp(2.1rem, 5vw, 3.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  /* Свечение вокруг заголовка — то же, что у пятен на фоне, только плотнее. */
+  text-shadow: 0 0 60px rgba(245, 158, 11, 0.25);
+}
+
+.hero__accent {
+  background: linear-gradient(100deg, var(--amber-bright), #f97316 60%, #fb7185);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero__lead {
+  max-width: 56ch;
+  margin: 0 0 28px;
+  color: #aab1cd;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.cta {
+  padding: 14px 28px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(120deg, var(--amber-bright), #f97316);
+  color: #1a1206;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow:
+    0 10px 30px rgba(245, 158, 11, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.cta:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 14px 40px rgba(245, 158, 11, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.ghost {
+  padding: 14px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8eaf6;
+  font: inherit;
+  font-size: 16px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ghost:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ghost--small {
+  padding: 9px 16px;
+  font-size: 14px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #c8cde8;
+  font-size: 13px;
+}
+
+.chip__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 10px #34d399;
+}
+
+/* ── Боковая карточка ───────────────────────────────────────────────────── */
+
+.latest {
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(8px);
+}
+
+.latest__title {
+  margin: 0 0 10px;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.latest__text {
+  margin: 0 0 18px;
+  color: #a9b0d0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── Панели ─────────────────────────────────────────────────────────────── */
+
+.panel {
+  margin-bottom: 20px;
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+}
+
+.panel__title {
+  margin: 0 0 10px;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+
+.panel__note {
+  margin: 0 0 12px;
+  color: #a9b0d0;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.panel__note:last-child {
+  margin-bottom: 0;
+}
+
+.panel a {
+  color: var(--amber-bright);
+}
+
+.panel code,
+.links code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+}
+
+/* Список ссылок: проверки состояния и подобное. */
+.links {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.links__item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #a9b0d0;
+  font-size: 15px;
+}
+
+.links__item a {
+  color: var(--amber-bright);
+  text-decoration: none;
+}
+
+.links__item a:hover {
+  text-decoration: underline;
+}
+
+.foot {
+  margin-top: 36px;
+  color: #6f7695;
+  font-size: 13px;
+}
+
+.stage__error {
+  margin: 0;
+  padding: 14px 18px;
+  background: #7f1d1d;
+  color: #fee2e2;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+}
+
+/* ── Узкие экраны ───────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .bar__nav {
+    display: none;
+  }
+}
+
+/* Кто просил меньше движения — получает его. */
+@media (prefers-reduced-motion: reduce) {
+  .stage__glow {
+    animation: none;
+  }
+
+  .cta {
+    transition: none;
+  }
+}

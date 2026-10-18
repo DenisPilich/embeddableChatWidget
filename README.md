@@ -2,11 +2,15 @@
 
 An embeddable chat widget: the site owner adds a single `<script>` line and gets a chat window on their page, where an LLM answers by default and a human operator joins only when needed.
 
-**Live demo:** <https://embeddable-chat-widget-deniskagods-projects.vercel.app/demo> — the customer page with the widget. The operator dashboard is at [the same address, `/dashboard`](https://embeddable-chat-widget-deniskagods-projects.vercel.app/dashboard), sign in as `demo@example.com` / `demo-operator-2026`. How to deploy your own copy: [docs/DEPLOY.md](docs/DEPLOY.md).
+**Where things are:** `/` is the entry point — two links, a health panel, nothing to guess. `/demo` is the customer page with the widget on it. `/dashboard` is the operator queue, sign in as `demo@example.com` / `demo-operator-2026`. How to deploy your own copy: [docs/DEPLOY.md](docs/DEPLOY.md).
+
+Live: <https://embeddable-chat-widget-deniskagods-projects.vercel.app> (entry point), [/demo](https://embeddable-chat-widget-deniskagods-projects.vercel.app/demo), [/dashboard](https://embeddable-chat-widget-deniskagods-projects.vercel.app/dashboard).
+
+![The entry point: a dark landing with two links, one to the demo page and one to the dashboard](docs/home-page.png)
 
 ![The demo page: a dark, atmospheric coffee shop landing with the chat widget in the corner](docs/demo-page.png)
 
-The page is deliberately heavy-looking and the widget is not: the site keeps its own look, the widget arrives as one script tag and stays out of the way. That contrast is the point of the project, not decoration.
+Both pages are dark, glowing and heavy-looking — and the widget is none of those things. The site keeps its own look, the widget arrives as one script tag and stays out of the way. That contrast is the point of the project, not decoration: styling does not travel with the widget, and neither does its weight.
 
 > **Status: the widget, the backend and the operator dashboard work end to end.** The widget is published on npm, a real model answers and streams its answer, the visitor can ask for a human, and the dashboard is where that human replies.
 
