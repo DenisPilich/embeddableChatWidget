@@ -1,4 +1,4 @@
-# Embeddable Chat Widget
+﻿# Embeddable Chat Widget
 
 An embeddable chat widget: the site owner adds a single `<script>` line and gets a chat window on their page, where an LLM answers by default and a human operator joins only when needed.
 
@@ -149,7 +149,7 @@ Authorisation is one check in one place: a conversation is found only if its sit
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.2.0/dist/ecw-loader.iife.js"
+  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.2.1/dist/ecw-loader.iife.js"
   data-site-id="site_123"
   async
 ></script>
@@ -165,7 +165,7 @@ By default the widget calls the address baked in at build time. Self-hosters can
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.2.0/dist/ecw-loader.iife.js"
+  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.2.1/dist/ecw-loader.iife.js"
   data-site-id="site_123"
   data-ecw-api="https://chat.example.com"
   async
@@ -220,7 +220,7 @@ pnpm.cmd --filter @ecw/fixtures test:e2e ai
 
 ## Publishing
 
-The package is published: **`ecw-widget@0.2.0`**. The live URL is verified by a test — the widget really does boot from the CDN, rather than merely building locally.
+The package is published: **`ecw-widget@0.2.1`**. The live URL is verified by a test — the widget really does boot from the CDN, rather than merely building locally.
 
 **npm requires two-factor authentication to publish.** Without it the registry answers `403` with a message about 2FA and no hint that the problem is the account rather than the package. There are two workable paths:
 
@@ -263,7 +263,7 @@ npm.cmd deprecate ecw-widget@0.1.1 "Wrong build: the bundle reports version 0.1.
 Check that customers will get a working URL:
 
 ```powershell
-$env:ECW_CDN_URL = 'https://cdn.jsdelivr.net/npm/ecw-widget@0.2.0/dist/ecw-loader.iife.js'
+$env:ECW_CDN_URL = 'https://cdn.jsdelivr.net/npm/ecw-widget@0.2.1/dist/ecw-loader.iife.js'
 pnpm.cmd --filter @ecw/fixtures test:e2e cdn
 ```
 

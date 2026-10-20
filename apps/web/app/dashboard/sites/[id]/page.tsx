@@ -47,7 +47,7 @@ export default async function SiteSettingsPage({
   // Версию виджета в адресе менять при каждом выпуске. Это цена за то, что
   // виджет на чужих сайтах не меняется сам собой: без версии новая публикация
   // подменила бы его у всех, кто уже вставил строку.
-  const loader = 'https://cdn.jsdelivr.net/npm/ecw-widget@0.2.0/dist/ecw-loader.iife.js';
+  const loader = 'https://cdn.jsdelivr.net/npm/ecw-widget@0.2.1/dist/ecw-loader.iife.js';
 
   const snippet = `<script
   src="${loader}"
