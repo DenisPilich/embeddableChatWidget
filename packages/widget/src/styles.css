@@ -405,7 +405,138 @@
   }
 }
 
+/* ── Меню выбора ────────────────────────────────────────────────────── */
+
+/*
+  Первый экран чата: пока посетитель не выбрал пункт, писать ему некуда.
+  Поэтому список занимает место поля ввода, а не висит над ним.
+*/
+.ecw-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid #eceef1;
+  background: #fff;
+}
+
+.ecw-menu[hidden] {
+  display: none;
+}
+
+.ecw-menu__items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ecw-menu__item {
+  padding: 11px 14px;
+  border: 1px solid #d9dbe1;
+  border-radius: 12px;
+  background: #fff;
+  color: #1f2937;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.ecw-menu__item:hover {
+  border-color: var(--ecw-primary);
+  background: #f8fafc;
+}
+
+.ecw-menu__item:focus-visible {
+  outline: 2px solid var(--ecw-primary);
+  outline-offset: 1px;
+}
+
+.ecw-menu__back {
+  align-self: flex-start;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--ecw-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ecw-menu__back:hover {
+  text-decoration: underline;
+}
+
+.ecw-menu__back[hidden] {
+  display: none;
+}
+
+/* ── Телефон ────────────────────────────────────────────────────────── */
+
+.ecw-phone {
+  padding: 12px;
+  border-top: 1px solid #eceef1;
+  background: #fff;
+}
+
+.ecw-phone[hidden] {
+  display: none;
+}
+
+.ecw-phone__text {
+  margin: 0 0 10px;
+  color: #374151;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ecw-phone__form {
+  display: flex;
+  gap: 8px;
+}
+
+.ecw-phone__input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #d9dbe1;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 15px;
+}
+
+.ecw-phone__input:focus-visible {
+  outline: 2px solid var(--ecw-primary);
+  outline-offset: 1px;
+}
+
+.ecw-phone__submit {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--ecw-primary);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ecw-phone__submit:hover {
+  filter: brightness(1.08);
+}
+
 /* ── Поле ввода ─────────────────────────────────────────────────────── */
+
+/* `[hidden]` на флекс-контейнере не работает: собственный `display: flex`
+   перебивает умолчание браузера. Без этого правила поле ввода оставалось бы
+   видимым на экране меню — и посетитель писал бы туда, где писать нечего. */
+.ecw-composer[hidden] {
+  display: none;
+}
 
 .ecw-composer {
   display: flex;

@@ -44,6 +44,39 @@ const SYSTEM_PROMPT = [
 /** Файл с ключами для автотестов. В репозиторий не попадает — он в .gitignore. */
 const SEED_FILE = new URL('../.seed-sites.json', import.meta.url);
 
+/**
+ * Меню демонстрационного сайта.
+ *
+ * Порядок неслучаен: сначала то, что спрашивают чаще всего, в конце — «свой
+ * вопрос». Ассистент — последний пункт, а не единственный вход: он дороже и
+ * медленнее готового ответа.
+ */
+const MENU_ITEMS: readonly {
+  label: string;
+  action: 'ANSWER' | 'OPERATOR' | 'AI' | 'SUBMENU';
+  answer?: string;
+}[] = [
+  {
+    label: 'What are your opening hours?',
+    action: 'ANSWER',
+    answer: 'Monday to Friday 08:00–21:00, Saturday 09:00–22:00, Sunday 09:00–19:00.',
+  },
+  {
+    label: 'How does delivery work?',
+    action: 'ANSWER',
+    answer:
+      'Courier in the city the next day — 300 lei, free over 1000 lei. We do not ship outside the country yet.',
+  },
+  {
+    label: 'I want to talk to a human',
+    action: 'OPERATOR',
+  },
+  {
+    label: 'Ask my own question',
+    action: 'AI',
+  },
+];
+
 interface SiteSeed {
   id: string;
   name: string;
@@ -191,6 +224,29 @@ async function main(): Promise<void> {
             ...look,
           },
         });
+
+    // Меню для посетителя. Создаём, только если его ещё нет: иначе запуск
+    // наполнения стирал бы настройки владельца — на этих граблях мы уже стояли
+    // со списком источников.
+    const menuCount = await prisma.menuOption.count({ where: { siteId: site.id } });
+
+    if (menuCount === 0) {
+      // Меню без ассистента бессмысленно в демонстрации: последний пункт ведёт
+      // к свободному вопросу, а он без ассистента не работает.
+      await prisma.site.update({ where: { id: site.id }, data: { aiEnabled: true } });
+
+      for (const [index, item] of MENU_ITEMS.entries()) {
+        await prisma.menuOption.create({
+          data: {
+            siteId: site.id,
+            label: item.label,
+            action: item.action,
+            answer: item.answer ?? null,
+            position: index,
+          },
+        });
+      }
+    }
 
     await prisma.aiConfig.upsert({
       where: { siteId: site.id },

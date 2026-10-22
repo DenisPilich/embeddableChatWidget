@@ -296,6 +296,46 @@ export async function requestHuman(params: {
   return updated.count > 0;
 }
 
+/**
+ * Запоминает номер, оставленный посетителем.
+ *
+ * Номер пишется в сам разговор, а не в отдельную сущность: он нужен ровно в
+ * контексте «перезвонить вот этому человеку про вот это».
+ */
+export async function setConversationPhone(params: {
+  siteId: string;
+  conversationId: string;
+  phone: string;
+}): Promise<void> {
+  await prisma.conversation.updateMany({
+    where: { id: params.conversationId, siteId: params.siteId },
+    data: { phone: params.phone },
+  });
+}
+
+/** Состояние разговора, которое видно посетителю. */
+export async function readConversationState(params: {
+  siteId: string;
+  conversationId: string;
+}): Promise<{
+  waitingForHuman: boolean;
+  humanRequestedAt: Date | null;
+  phone: string | null;
+} | null> {
+  const conversation = await prisma.conversation.findFirst({
+    where: { id: params.conversationId, siteId: params.siteId },
+    select: { humanRequestedAt: true, phone: true },
+  });
+
+  if (conversation === null) return null;
+
+  return {
+    waitingForHuman: conversation.humanRequestedAt !== null,
+    humanRequestedAt: conversation.humanRequestedAt,
+    phone: conversation.phone,
+  };
+}
+
 /** Ждёт ли диалог оператора. */
 export async function isWaitingForHuman(params: {
   siteId: string;

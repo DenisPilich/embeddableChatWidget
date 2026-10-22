@@ -3,6 +3,7 @@ import type { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { isOriginAllowed, ownOrigin } from '@/lib/cors';
 import { findSiteByPublicKey, resolveOpenConversation, resolveVisitor } from '@/lib/data';
+import { listMenuTree } from '@/lib/menu';
 import {
   errorResponse,
   jsonResponse,
@@ -105,6 +106,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       title: site.widgetTitle,
       greeting: site.widgetGreeting,
     },
+    // Меню приходит вместе с сессией: это первый экран чата, и второй запрос
+    // ради списка означал бы пустое окно на мгновение.
+    menu: await listMenuTree(site.id),
+    aiEnabled: site.aiEnabled,
+    handoverTimeout: site.handoverTimeoutSeconds,
+    humanRequestedAt: conversation.humanRequestedAt?.toISOString() ?? null,
+    phone: conversation.phone,
   };
   return jsonResponse(response, 200, origin);
 }

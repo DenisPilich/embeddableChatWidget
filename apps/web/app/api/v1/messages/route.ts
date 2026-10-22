@@ -1,4 +1,4 @@
-import type { ChatMessage, MessagesResponse, SendMessageResponse } from '@ecw/shared';
+import type { MessagesResponse, SendMessageResponse } from '@ecw/shared';
 import type { Message } from '@prisma/client';
 import type { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -303,29 +303,9 @@ function streamReply(params: {
   });
 }
 
-/** Приводит сообщение из базы к общему контракту. */
-function toWireMessage(message: Message): ChatMessage {
-  return {
-    id: message.id,
-    seq: message.seq,
-    conversationId: message.conversationId,
-    authorKind: AUTHOR_KIND[message.author],
-    body: message.body,
-    createdAt: message.createdAt.toISOString(),
-    // Пустое поле не добавляем вовсе: у сообщений ассистента и оператора
-    // клиентского идентификатора нет, и `clientId: undefined` в ответе был бы
-    // шумом, который потребитель может принять за значение.
-    ...(message.clientId === null ? {} : { clientId: message.clientId }),
-  };
-}
-
 /**
- * Перечисление в базе — заглавными буквами, в контракте — строчными.
- * Соответствие задано таблицей, а не преобразованием регистра: если в базе
- * появится новое значение, компилятор заставит его описать.
+ * Переписку отдаёт не только этот маршрут, поэтому приведение к контракту живёт
+ * в lib/chat-message.ts. Импортируем под прежним именем: внутри файла оно
+ * читается как местное, а второй копии формата не появляется.
  */
-const AUTHOR_KIND = {
-  VISITOR: 'visitor',
-  AI: 'ai',
-  AGENT: 'agent',
-} as const satisfies Record<Message['author'], ChatMessage['authorKind']>;
+import { toChatMessage as toWireMessage } from '@/lib/chat-message';

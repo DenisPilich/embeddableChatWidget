@@ -1,4 +1,4 @@
-import type { ChatMessage, WidgetAppearance } from '@ecw/shared';
+import type { ChatMessage, MenuItem, WidgetAppearance } from '@ecw/shared';
 
 /**
  * Транспорт: как сообщения попадают на сервер и возвращаются обратно.
@@ -29,6 +29,21 @@ export type MessagesHandler = (messages: readonly ChatMessage[]) => void;
 
 /** Кусок ответа, пришедший раньше, чем ответ готов целиком. */
 export type DeltaHandler = (text: string) => void;
+
+/** Что вернул выбор пункта меню. */
+export interface MenuChoice {
+  /** Сообщения, появившиеся в переписке от этого выбора. */
+  messages: readonly ChatMessage[];
+  waitingForHuman: boolean;
+  /** Момент просьбы об операторе, мс эпохи, или null. */
+  waitingSince: number | null;
+}
+
+/** Что вернуло оставление телефона. */
+export interface PhoneLeft {
+  message: ChatMessage;
+  phone: string;
+}
 
 export interface Transport {
   /**
@@ -90,6 +105,36 @@ export interface Transport {
    * Известен после `connect`.
    */
   readonly appearance: WidgetAppearance | null;
+
+  /**
+   * Пункты меню, настроенные владельцем сайта. Пусто — меню нет, и виджет
+   * работает как обычный чат с полем ввода.
+   */
+  readonly menu: readonly MenuItem[];
+
+  /** Отвечает ли ассистент на свободные вопросы. Известно после `connect`. */
+  readonly aiEnabled: boolean;
+
+  /** Сколько секунд ждать оператора, прежде чем предложить телефон. */
+  readonly handoverTimeout: number;
+
+  /** Когда попросили оператора (мс эпохи) или `null`. Нужно для отсчёта. */
+  readonly waitingSince: number | null;
+
+  /** Телефон, уже оставленный посетителем, или `null`. */
+  readonly phone: string | null;
+
+  /**
+   * Выбор пункта меню.
+   *
+   * Отдельное действие, а не сообщение: нажатие может значить «покажи ответ»,
+   * «позови человека» или «открой подменю». Возвращает появившиеся сообщения,
+   * чтобы виджет показал их сразу, не дожидаясь опроса.
+   */
+  chooseMenuItem(optionId: string): Promise<MenuChoice>;
+
+  /** Оставляет телефон вместо ожидания оператора. */
+  leavePhone(phone: string): Promise<PhoneLeft>;
 
   /** Прекращает работу: останавливает опрос, закрывает соединение. */
   close(): void;

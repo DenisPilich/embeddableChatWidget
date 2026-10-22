@@ -100,11 +100,23 @@ model Site {
   widgetTitle    String?
   widgetGreeting String?
 
+  /// Отвечает ли ассистент на свободные вопросы.
+  ///
+  /// По умолчанию выключен: сначала посетителю показывают меню, а свободный
+  /// вопрос — это последний пункт, а не единственный вход. Владелец, которому
+  /// ассистент не нужен вовсе, просто не включает галочку.
+  aiEnabled Boolean @default(false)
+
+  /// Сколько секунд ждать оператора, прежде чем предложить оставить телефон.
+  /// Пределы 60–1800 (одна–тридцать минут) проверяются в панели.
+  handoverTimeoutSeconds Int @default(300)
+
   workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   visitors      Visitor[]
   conversations Conversation[]
   aiConfig      AiConfig?
   tokenUsage    TokenUsage[]
+  menuOptions   MenuOption[]
 
   @@index([workspaceId])
   @@map("sites")
@@ -190,6 +202,19 @@ model Conversation {
   /// предлагается человек, а не бесконечное «попробуйте позже».
   answerFailures Int @default(0)
 
+  /// Телефон, оставленный посетителем, когда оператор не пришёл.
+  ///
+  /// Не отдельная сущность: номер нужен ровно в контексте этого разговора —
+  /// «перезвонить вот этому человеку про вот это». Отдельная таблица заявок
+  /// потребовала бы ещё одного экрана, который никто не открывает.
+  phone String?
+
+  /// Когда по этому номеру перезвонили. Пусто — ещё не перезвонили.
+  ///
+  /// Без этой отметки номера уходят в пустоту, а обещание «мы вам перезвоним»
+  /// становится ложью. Отметка ставится в панели одним нажатием.
+  calledBackAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -200,6 +225,57 @@ model Conversation {
   @@index([siteId, status])
   @@index([visitorId])
   @@map("conversations")
+}
+
+// ── Меню для посетителя ─────────────────────────────────────────────────────
+
+/// Что делает пункт меню.
+enum MenuAction {
+  /// Показать текстовый ответ.
+  ANSWER
+  /// Позвать живого оператора.
+  OPERATOR
+  /// Открыть подменю.
+  SUBMENU
+  /// Дать написать свой вопрос ассистенту.
+  AI
+}
+
+/// Пункт меню, который видит посетитель в чате.
+///
+/// Дерево через parentId: подменю — это те же пункты внутри другого. Плоский
+/// список из пяти вопросов читается, из двадцати — нет, а «конструктор
+/// сценариев» с шагами и условиями не заполняет никто.
+model MenuOption {
+  id       String  @id @default(cuid())
+  siteId   String
+  parentId String?
+
+  /// Текст на кнопке. Виден посетителю и попадает в переписку как вопрос —
+  /// оператор должен видеть, что именно человек выбрал.
+  label String
+
+  action MenuAction @default(ANSWER)
+
+  /// Текст ответа. Обязателен для ANSWER, пуст у остальных.
+  answer String?
+
+  /// Порядок среди соседей, от меньшего к большему.
+  position Int @default(0)
+
+  /// Сколько раз нажали. Единственная статистика, которая здесь окупается:
+  /// владелец видит, какие вопросы задают на самом деле, и переделывает меню
+  /// по факту, а не по догадке.
+  clicks Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  site     Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  parent   MenuOption? @relation("MenuTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children MenuOption[] @relation("MenuTree")
+
+  @@index([siteId, parentId, position])
+  @@map("menu_options")
 }
 
 enum MessageAuthor {

@@ -1,6 +1,21 @@
-import type { ChatMessage, InitResponse, MessagesResponse, WidgetAppearance } from '@ecw/shared';
+import type {
+  ChatMessage,
+  InitResponse,
+  MenuClickResponse,
+  MenuItem,
+  MessagesResponse,
+  PhoneResponse,
+  WidgetAppearance,
+} from '@ecw/shared';
 import { loadToken, saveToken } from './storage';
-import type { DeltaHandler, MessagesHandler, OutgoingMessage, Transport } from './transport';
+import type {
+  DeltaHandler,
+  MenuChoice,
+  MessagesHandler,
+  OutgoingMessage,
+  PhoneLeft,
+  Transport,
+} from './transport';
 
 /**
  * Транспорт через обычные HTTP-запросы.
@@ -55,6 +70,14 @@ export interface HttpTransportOptions {
   apiUrl: string;
 }
 
+/** Момент из ISO-строки в миллисекунды эпохи. Непонятное значение — «неизвестно». */
+function parseMoment(value: string | null): number | null {
+  if (value === null) return null;
+
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 export class HttpTransport implements Transport {
   private handler: MessagesHandler | null = null;
   private deltaHandler: DeltaHandler | null = null;
@@ -63,6 +86,16 @@ export class HttpTransport implements Transport {
   private waiting = false;
   /** Вид, заданный владельцем сайта. Узнаём при открытии сессии. */
   private look: WidgetAppearance | null = null;
+  /** Меню сайта. Пусто — обычный чат. */
+  private menuItems: MenuItem[] = [];
+  /** Отвечает ли ассистент на свободные вопросы. */
+  private ai = false;
+  /** Сколько ждать оператора до предложения телефона. */
+  private handoverSeconds = 300;
+  /** Когда попросили оператора, мс эпохи. */
+  private since: number | null = null;
+  /** Оставленный телефон. */
+  private phoneNumber: string | null = null;
   /** Пришёл ли готовый ответ в этом потоке. Нужно, чтобы понять «ответа не будет». */
   private sawAnswer = false;
   /** Ждёт подтверждения приёма сообщения, которое завершает `send`. */
@@ -103,6 +136,64 @@ export class HttpTransport implements Transport {
     return this.look;
   }
 
+  get menu(): readonly MenuItem[] {
+    return this.menuItems;
+  }
+
+  get aiEnabled(): boolean {
+    return this.ai;
+  }
+
+  get handoverTimeout(): number {
+    return this.handoverSeconds;
+  }
+
+  get waitingSince(): number | null {
+    return this.since;
+  }
+
+  get phone(): string | null {
+    return this.phoneNumber;
+  }
+
+  /**
+   * Выбор пункта меню.
+   *
+   * Ответ уже содержит появившиеся сообщения: показывать их сразу — единственный
+   * способ не заставлять посетителя ждать ближайшего опроса после нажатия.
+   */
+  async chooseMenuItem(optionId: string): Promise<MenuChoice> {
+    const choice = await this.withToken(() =>
+      this.request<MenuClickResponse>('/api/v1/menu', {
+        method: 'POST',
+        authorized: true,
+        body: { optionId },
+      }),
+    );
+
+    this.waiting = choice.waitingForHuman;
+    this.since = parseMoment(choice.humanRequestedAt);
+
+    return {
+      messages: choice.messages,
+      waitingForHuman: choice.waitingForHuman,
+      waitingSince: this.since,
+    };
+  }
+
+  async leavePhone(phone: string): Promise<PhoneLeft> {
+    const left = await this.withToken(() =>
+      this.request<PhoneResponse>('/api/v1/phone', {
+        method: 'POST',
+        authorized: true,
+        body: { phone },
+      }),
+    );
+
+    this.phoneNumber = left.phone;
+    return { message: left.message, phone: left.phone };
+  }
+
   async requestHuman(): Promise<void> {
     await this.ensureSession();
 
@@ -134,6 +225,13 @@ export class HttpTransport implements Transport {
     saveToken(this.options.siteId, session.token);
     this.waiting = session.waitingForHuman;
     this.look = session.appearance;
+    // Меню и настройки — из ответа, но с запасом: виджет с чужого сайта может
+    // встретить сервер постарше, и падать из-за отсутствующего поля ему нельзя.
+    this.menuItems = Array.isArray(session.menu) ? session.menu : [];
+    this.ai = session.aiEnabled === true;
+    this.handoverSeconds = session.handoverTimeout ?? 300;
+    this.since = parseMoment(session.humanRequestedAt ?? null);
+    this.phoneNumber = session.phone ?? null;
     // Отступаем на окно назад, а не встаём на последний номер: иначе то, что
     // пришло, пока страница была закрыта, не увидит никто.
     this.cursor = Math.max(0, session.lastSeq - CATCH_UP_WINDOW);
@@ -181,6 +279,28 @@ export class HttpTransport implements Transport {
 
   private async ensureSession(): Promise<void> {
     if (!this.token) await this.connect();
+  }
+
+  /**
+   * Повторяет запрос один раз, если токен просрочился.
+   *
+   * Токен живёт двенадцать часов, а вкладка может жить дольше. Просроченный
+   * токен — не ошибка посетителя, а обычное дело: молча берём новый.
+   */
+  private async withToken<T>(run: () => Promise<T>): Promise<T> {
+    await this.ensureSession();
+
+    try {
+      return await run();
+    } catch (error) {
+      if (error instanceof HttpError && error.status === 401) {
+        this.token = null;
+        await this.connect();
+        return await run();
+      }
+
+      throw error;
+    }
   }
 
   /** Отправляет сообщение и, если сервер умеет, читает поток ответа. */

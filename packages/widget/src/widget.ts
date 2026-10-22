@@ -1,4 +1,4 @@
-import type { AuthorKind, ChatMessage, WidgetAppearance } from '@ecw/shared';
+import type { AuthorKind, ChatMessage, MenuItem, WidgetAppearance } from '@ecw/shared';
 import { mustFind, pickMountNode } from './dom';
 import { log } from './logger';
 import { MessagesView } from './messages-view';
@@ -92,6 +92,38 @@ const MARKUP = `
       </div>
     </div>
 
+    <div class="ecw-menu" data-ecw-menu hidden>
+      <div class="ecw-menu__items" data-ecw-menu-items></div>
+      <button
+        type="button"
+        class="ecw-menu__back"
+        data-ecw-action="menu-back"
+        data-ecw-menu-back
+        hidden
+      >
+        ← Back
+      </button>
+    </div>
+
+    <div class="ecw-phone" data-ecw-phone hidden>
+      <p class="ecw-phone__text">
+        Sorry for the wait. Leave your number and we will call you back.
+      </p>
+      <form class="ecw-phone__form" data-ecw-phone-form novalidate>
+        <label class="ecw-visually-hidden" for="ecw-phone">Phone number</label>
+        <input
+          id="ecw-phone"
+          class="ecw-phone__input"
+          type="tel"
+          inputmode="tel"
+          autocomplete="tel"
+          value="+373"
+          data-ecw-phone-input
+        />
+        <button type="submit" class="ecw-phone__submit" data-ecw-phone-submit>Send</button>
+      </form>
+    </div>
+
     <form class="ecw-composer" data-ecw-composer novalidate>
       <label class="ecw-visually-hidden" for="ecw-input">Message</label>
       <textarea
@@ -141,6 +173,15 @@ const MARKUP = `
   </button>
 `;
 
+/** «4:12» из остатка в миллисекундах. */
+function formatLeft(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+
+  return `${String(minutes)}:${String(seconds).padStart(2, '0')}`;
+}
+
 /**
  * Виджет на странице клиента.
  *
@@ -164,6 +205,12 @@ export class ChatWidget implements WidgetInstance {
   private readonly input: HTMLTextAreaElement;
   private readonly sendButton: HTMLButtonElement;
   private readonly composer: HTMLFormElement;
+  private readonly menuBox: HTMLElement;
+  private readonly menuItems: HTMLElement;
+  private readonly menuBack: HTMLButtonElement;
+  private readonly phoneBox: HTMLElement;
+  private readonly phoneForm: HTMLFormElement;
+  private readonly phoneInput: HTMLInputElement;
   private readonly shadow: ShadowRoot;
   private readonly messages: MessagesView;
   private readonly onDocumentKeyDown: (event: KeyboardEvent) => void;
@@ -182,6 +229,20 @@ export class ChatWidget implements WidgetInstance {
   private waiting = false;
   /** Текст приветствия. Может быть задан владельцем сайта. */
   private greeting = GREETING;
+  /** Меню сайта. Пусто — обычный чат с полем ввода. */
+  private menu: MenuItem[] = [];
+  /** Отвечает ли ассистент на свободные вопросы. */
+  private aiEnabled = false;
+  /** Сколько секунд ждать оператора до предложения телефона. */
+  private handoverSeconds = 300;
+  /** Когда попросили оператора, мс эпохи. */
+  private waitingSince: number | null = null;
+  /** Открытое подменю или `null`, если показан верхний уровень. */
+  private menuPath: MenuItem | null = null;
+  /** Отсчёт ожидания: перерисовывает подпись раз в секунду. */
+  private clock: number | null = null;
+  /** Оставлял ли посетитель телефон. Второй раз не спрашиваем. */
+  private phoneGiven = false;
 
   constructor(
     private readonly options: InitOptions,
@@ -216,6 +277,12 @@ export class ChatWidget implements WidgetInstance {
     this.input = mustFind<HTMLTextAreaElement>(shadow, '[data-ecw-input]');
     this.sendButton = mustFind<HTMLButtonElement>(shadow, '[data-ecw-send]');
     this.composer = mustFind<HTMLFormElement>(shadow, '[data-ecw-composer]');
+    this.menuBox = mustFind<HTMLElement>(shadow, '[data-ecw-menu]');
+    this.menuItems = mustFind<HTMLElement>(shadow, '[data-ecw-menu-items]');
+    this.menuBack = mustFind<HTMLButtonElement>(shadow, '[data-ecw-menu-back]');
+    this.phoneBox = mustFind<HTMLElement>(shadow, '[data-ecw-phone]');
+    this.phoneForm = mustFind<HTMLFormElement>(shadow, '[data-ecw-phone-form]');
+    this.phoneInput = mustFind<HTMLInputElement>(shadow, '[data-ecw-phone-input]');
     this.messages = new MessagesView(
       mustFind<HTMLElement>(shadow, '.ecw-body'),
       mustFind<HTMLElement>(shadow, '.ecw-log'),
@@ -236,6 +303,10 @@ export class ChatWidget implements WidgetInstance {
       this.refreshSendState();
     });
     this.input.addEventListener('keydown', (event) => this.handleInputKeyDown(event));
+    this.phoneForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      void this.sendPhone();
+    });
 
     // Обработчик висит на документе, а не на shadow root: события клавиатуры
     // всплывают из теневого дерева наружу, поэтому так мы поймаем их, даже если
@@ -268,6 +339,14 @@ export class ChatWidget implements WidgetInstance {
     void this.transport
       .connect()
       .then(() => {
+        // Настройки сайта известны только теперь: до открытия сессии виджет не
+        // знает ни меню, ни того, включён ли ассистент.
+        this.menu = [...this.transport.menu];
+        this.aiEnabled = this.transport.aiEnabled;
+        this.handoverSeconds = this.transport.handoverTimeout;
+        this.waitingSince = this.transport.waitingSince;
+        this.phoneGiven = this.transport.phone !== null;
+
         // Состояние ожидания известно только после открытия сессии: диалог мог
         // ждать оператора ещё с прошлого визита.
         this.setWaiting(this.transport.waitingForHuman);
@@ -286,6 +365,7 @@ export class ChatWidget implements WidgetInstance {
         // сайта, а приходит он вместе с сессией. Показать одно приветствие и
         // сразу заменить его на другое — хуже, чем подождать доли секунды.
         this.showGreetingIfEmpty();
+        this.refreshFlow();
       });
   }
 
@@ -363,10 +443,19 @@ export class ChatWidget implements WidgetInstance {
     const target = event.target;
     if (!(target instanceof Element)) return;
 
+    // Пункты меню приходят из базы, поэтому у них отдельный атрибут: смешивать
+    // их с действиями самого виджета значило бы позволить базе вызвать «закрыть».
+    const optionId = target.closest('[data-ecw-option]')?.getAttribute('data-ecw-option');
+    if (optionId !== null && optionId !== undefined) {
+      void this.choose(optionId);
+      return;
+    }
+
     const action = target.closest('[data-ecw-action]')?.getAttribute('data-ecw-action');
     if (action === 'toggle') this.toggle();
     else if (action === 'close') this.close();
     else if (action === 'human') void this.askForHuman();
+    else if (action === 'menu-back') this.goBack();
   }
 
   /**
@@ -401,9 +490,222 @@ export class ChatWidget implements WidgetInstance {
   private setWaiting(waiting: boolean): void {
     this.waiting = waiting;
     this.host.toggleAttribute('data-ecw-waiting', waiting);
-
-    this.status.textContent = waiting ? 'An operator will reply' : 'Assistant replies';
     this.humanButton.hidden = waiting;
+
+    if (waiting) {
+      this.startClock();
+    } else {
+      this.stopClock();
+      this.status.textContent = 'Assistant replies';
+    }
+
+    this.refreshFlow();
+  }
+
+  /**
+   * Показывает тот экран, который сейчас уместен.
+   *
+   * Порядок важнее, чем кажется: пока посетитель не выбрал пункт меню, писать
+   * ему некуда — поле ввода появляется только после явного выбора. Это и есть
+   * разница между «чат-навигатор» и «чат, в котором надо придумать вопрос».
+   */
+  private refreshFlow(): void {
+    if (this.waiting) {
+      // Ждём человека: выбор уже сделан, меню больше не нужно. Через отведённое
+      // время вместо пустого ожидания предлагаем оставить номер.
+      const askPhone = this.isOverdue() && !this.phoneGiven;
+      this.menuBox.hidden = true;
+      this.phoneBox.hidden = !askPhone;
+      this.showComposer(!askPhone);
+      return;
+    }
+
+    this.phoneBox.hidden = true;
+
+    if (this.menu.length > 0) {
+      this.menuPath = null;
+      this.renderMenu(this.menu);
+      this.menuBox.hidden = false;
+      this.showComposer(false);
+      return;
+    }
+
+    // Меню нет — виджет ведёт себя как обычный чат.
+    this.menuBox.hidden = true;
+    this.showComposer(true);
+  }
+
+  /** Прошло ли время ожидания, после которого предлагаем телефон. */
+  private isOverdue(): boolean {
+    if (this.waitingSince === null) return false;
+
+    return Date.now() - this.waitingSince >= this.handoverSeconds * 1000;
+  }
+
+  /** Рисует пункты. Текст берём через `textContent`: он приходит из базы. */
+  private renderMenu(items: readonly MenuItem[]): void {
+    this.menuItems.replaceChildren();
+
+    for (const item of items) {
+      // «Свой вопрос» показываем только когда ассистент включён: иначе пункт
+      // обещает то, чего сайт не умеет.
+      if (item.action === 'ai' && !this.aiEnabled) continue;
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ecw-menu__item';
+      button.setAttribute('data-ecw-option', item.id);
+      button.textContent = item.label;
+      this.menuItems.append(button);
+    }
+
+    this.menuBack.hidden = this.menuPath === null;
+  }
+
+  /** Возвращает меню на верхний уровень. */
+  private goBack(): void {
+    this.menuPath = null;
+    this.renderMenu(this.menu);
+  }
+
+  private showComposer(visible: boolean): void {
+    this.composer.hidden = !visible;
+  }
+
+  /** Нажатие пункта меню. */
+  private async choose(optionId: string): Promise<void> {
+    const item = this.findOption(this.menu, optionId);
+    if (item === undefined) return;
+
+    log(`выбран пункт «${item.label}»`);
+
+    if (item.action === 'submenu') {
+      this.menuPath = item;
+      this.renderMenu(item.children);
+      return;
+    }
+
+    if (item.action === 'ai') {
+      // Свободный вопрос: показываем поле ввода, меню убираем.
+      this.menuPath = null;
+      this.menuBox.hidden = true;
+      this.showComposer(true);
+      this.input.focus();
+      return;
+    }
+
+    try {
+      const choice = await this.transport.chooseMenuItem(item.id);
+
+      for (const message of choice.messages) {
+        this.appendMessage({
+          id: message.id,
+          authorKind: message.authorKind,
+          body: message.body,
+          createdAt: message.createdAt,
+          status: 'sent',
+        });
+      }
+
+      // После ответа возвращаемся к списку: посетитель часто спрашивает второе.
+      this.menuPath = null;
+      this.renderMenu(this.menu);
+
+      if (choice.waitingForHuman) {
+        this.waitingSince = choice.waitingSince;
+        this.setWaiting(true);
+      }
+
+      this.registerIncoming();
+    } catch (error) {
+      console.error('[ecw] не удалось выбрать пункт меню', error);
+    }
+  }
+
+  /** Ищет пункт по идентификатору во всём дереве. */
+  private findOption(items: readonly MenuItem[], id: string): MenuItem | undefined {
+    for (const item of items) {
+      if (item.id === id) return item;
+
+      const nested = this.findOption(item.children, id);
+      if (nested !== undefined) return nested;
+    }
+
+    return undefined;
+  }
+
+  /** Отправляет оставленный телефон. */
+  private async sendPhone(): Promise<void> {
+    const value = this.phoneInput.value.trim();
+    if (value.replace(/\D/g, '').length < 6) {
+      this.status.textContent = 'Please enter a full number';
+      return;
+    }
+
+    try {
+      const left = await this.transport.leavePhone(value);
+      this.phoneGiven = true;
+      this.phoneInput.value = left.phone;
+
+      this.appendMessage({
+        id: left.message.id,
+        authorKind: left.message.authorKind,
+        body: left.message.body,
+        createdAt: left.message.createdAt,
+        status: 'sent',
+      });
+      this.registerIncoming();
+
+      // Форма больше не нужна: номер записан, обещание дано.
+      this.phoneBox.hidden = true;
+      this.showComposer(true);
+      this.panel.focus();
+    } catch (error) {
+      console.error('[ecw] не удалось оставить номер', error);
+      this.status.textContent = 'Could not send the number';
+    }
+  }
+
+  /** Запускает отсчёт ожидания. */
+  private startClock(): void {
+    if (this.clock !== null) return;
+
+    this.tick();
+    this.clock = window.setInterval(() => {
+      this.tick();
+    }, 1000);
+  }
+
+  private stopClock(): void {
+    if (this.clock === null) return;
+
+    window.clearInterval(this.clock);
+    this.clock = null;
+  }
+
+  /** Перерисовывает подпись в шапке и вовремя предлагает телефон. */
+  private tick(): void {
+    if (!this.waiting) return;
+
+    if (this.waitingSince === null) {
+      this.status.textContent = 'An operator will reply';
+      return;
+    }
+
+    const left = this.handoverSeconds * 1000 - (Date.now() - this.waitingSince);
+
+    if (left > 0) {
+      // Посетитель должен видеть, что его ждут, а не гадать.
+      this.status.textContent = `Waiting for an operator · ${formatLeft(left)}`;
+      return;
+    }
+
+    this.status.textContent = 'No operator is free yet';
+
+    if (!this.phoneGiven && this.phoneBox.hidden) {
+      this.refreshFlow();
+      this.phoneInput.focus();
+    }
   }
 
   /**
