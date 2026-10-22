@@ -1,4 +1,4 @@
-﻿# ecw-widget
+# ecw-widget
 
 An embeddable chat widget in one `<script>` tag. The model answers by default, a human operator takes over when the visitor asks for one, answers stream in as they are written, and none of it disturbs the page it lands on.
 
