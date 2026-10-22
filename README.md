@@ -1,4 +1,4 @@
-﻿# Embeddable Chat Widget
+# Embeddable Chat Widget
 
 An embeddable chat widget: the site owner adds a single `<script>` line and gets a chat window on their page, where an LLM answers by default and a human operator joins only when needed.
 
@@ -27,8 +27,8 @@ pnpm dev                                        # build the widget and start eve
 Then:
 
 1. Open **http://localhost:5173** — a fictional coffee shop with the widget in the corner. This page talks to the real backend.
-2. Ask the assistant something, for example about opening hours.
-3. Press **Talk to a human**, then open **http://localhost:3000/dashboard** and sign in as `demo@example.com` / `demo-operator-2026`. The conversation is waiting in the queue, and an answer written there appears in the widget.
+2. Pick a question from the menu. Opening hours and delivery answer immediately — no model, no waiting.
+3. Pick **I want to talk to a human**, then open **http://localhost:3000/dashboard** and sign in as `demo@example.com` / `demo-operator-2026`. The conversation is waiting in the queue, and an answer written there appears in the widget.
 
 The same page also lives inside the application, on **http://localhost:3000/demo**. It is the one to use after deployment: the widget is served from the application's own `/ecw/` folder and calls the API on the same domain, so one address holds everything. See [docs/DEPLOY.md](docs/DEPLOY.md).
 
@@ -43,9 +43,14 @@ Chat widgets are not in short supply, and this is not an attempt to replace them
 
 ## What the demo shows
 
-Click a button on a third-party page → a chat window opens → an answer arrives within seconds. No sign-up, no "operator offline".
+The widget opens on a short menu that the site owner wrote, so the visitor does not have to invent a
+question. The answers arrive instantly and cost nothing: no model, no quota, no waiting. "Ask my own
+question" is the last item and the only place a model is involved — and it can be switched off
+entirely, per site, if the owner does not want one.
 
-Today that answer comes from a canned assistant. Phase 3 puts a real model behind the same interface, and nothing else has to change.
+Ask for a human and the countdown starts. After the configured timeout (five minutes by default) the
+widget stops pretending somebody is coming and offers to take a phone number instead. The number
+lands in the operator's queue where it can be marked as called back.
 
 ## Stack
 
@@ -139,6 +144,7 @@ What the dashboard does:
 - **Queue, waiting first.** Conversations that asked for a human come first, longest wait at the top. A queue where you cannot tell whom to pick up next is a list, not a queue.
 - **Read the conversation and reply.** A reply is stored as an `agent` message and reaches the visitor the same way the assistant's answers do.
 - **Close it.** Closing clears the waiting flag; until then the assistant stays quiet, so the visitor never reads two different people answering in turn.
+- **Hand over without leaving the visitor hanging.** The widget counts down the wait itself, and after the configured timeout offers to take a phone number. The number arrives in the queue with the conversation, where one click marks it as called back — an email service or a ticket system would be a dependency for a promise a human still has to keep.
 - **Configure the site.** Prompt, model, daily token budget, allowed origins, and how the widget looks — colour, window title and greeting. No SQL, and the appearance reaches the widget with the session.
 - **Manage access.** Workspaces, operator invitations with a generated password, and a recovery code for every account. Codes are stored as hashes and work from `/recover`; changing or recovering a password signs out every other session.
 - **Get told.** While the dashboard is open — even in a background tab — a new waiting conversation plays a short sound and raises a desktop notification, and the waiting count sits in the tab title. Nothing is sent when the tab is closed: that would need an email service or a push subscription with VAPID keys, and this project deliberately has neither.
@@ -149,7 +155,7 @@ Authorisation is one check in one place: a conversation is found only if its sit
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.2.1/dist/ecw-loader.iife.js"
+  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.3.0/dist/ecw-loader.iife.js"
   data-site-id="site_123"
   async
 ></script>
@@ -165,7 +171,7 @@ By default the widget calls the address baked in at build time. Self-hosters can
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.2.1/dist/ecw-loader.iife.js"
+  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.3.0/dist/ecw-loader.iife.js"
   data-site-id="site_123"
   data-ecw-api="https://chat.example.com"
   async
@@ -220,7 +226,7 @@ pnpm.cmd --filter @ecw/fixtures test:e2e ai
 
 ## Publishing
 
-The package is published: **`ecw-widget@0.2.1`**. The live URL is verified by a test — the widget really does boot from the CDN, rather than merely building locally.
+The widget is built and ready to publish as **`ecw-widget@0.3.0`**: the release adds the guided menu, so it is waiting for a publish rather than a build. Earlier versions are on npm, and a test verifies that the CDN URL really boots the widget rather than merely building locally.
 
 **npm requires two-factor authentication to publish.** Without it the registry answers `403` with a message about 2FA and no hint that the problem is the account rather than the package. There are two workable paths:
 
@@ -263,7 +269,7 @@ npm.cmd deprecate ecw-widget@0.1.1 "Wrong build: the bundle reports version 0.1.
 Check that customers will get a working URL:
 
 ```powershell
-$env:ECW_CDN_URL = 'https://cdn.jsdelivr.net/npm/ecw-widget@0.2.1/dist/ecw-loader.iife.js'
+$env:ECW_CDN_URL = 'https://cdn.jsdelivr.net/npm/ecw-widget@0.3.0/dist/ecw-loader.iife.js'
 pnpm.cmd --filter @ecw/fixtures test:e2e cdn
 ```
 

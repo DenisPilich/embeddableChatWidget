@@ -1,10 +1,11 @@
-# ecw-widget
+﻿# ecw-widget
 
 An embeddable chat widget in one `<script>` tag. The model answers by default, a human operator takes over when the visitor asks for one, answers stream in as they are written, and none of it disturbs the page it lands on.
 
 ![The chat widget open on a demo page: a question and the assistant's answer](https://raw.githubusercontent.com/DenisPilich/embeddableChatWidget/main/docs/widget-panel.png)
 
-- **9.27 kB gzipped**, no framework, no stylesheet leaking into the page.
+- **11.04 kB gzipped**, no framework, no stylesheet leaking into the page.
+- Opens on a **guided menu** the site owner writes: instant answers, no model, no quota.
 - Isolated in a **Shadow DOM**: page styles cannot reach in, widget styles cannot leak out.
 - Works on pages with a strict `Content-Security-Policy`.
 - Answers arrive over **Server-Sent Events**; the conversation survives a reload.
@@ -13,7 +14,7 @@ An embeddable chat widget in one `<script>` tag. The model answers by default, a
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.2.1/dist/ecw-loader.iife.js"
+  src="https://cdn.jsdelivr.net/npm/ecw-widget@0.3.0/dist/ecw-loader.iife.js"
   data-site-id="pub_your_site_key"
   data-ecw-api="https://your-app.example.com"
   async
@@ -36,15 +37,44 @@ An embeddable chat widget in one `<script>` tag. The model answers by default, a
 | File | Size (gzipped) | When it loads |
 |---|---|---|
 | `dist/ecw-loader.iife.js` | 678 B | immediately — this is the tag on the page |
-| `dist/ecw-widget.iife.js` | 9.27 kB | after `load`, while the browser is idle |
+| `dist/ecw-widget.iife.js` | 11.04 kB | after `load`, while the browser is idle |
 
 The loader derives the bundle's address from its own `src`, so the two files can never get out of step — which is also why the version in the URL covers both.
 
+## The visitor sees a menu first
+
+There is no input field until the visitor picks something. Opening hours, delivery, prices — the
+owner writes these once and the answers arrive instantly. A visitor who has to invent a question
+either invents a bad one or leaves.
+
+Each item is one of four things:
+
+| Action | What happens |
+|---|---|
+| **Answer** | The question and the written answer appear in the conversation. |
+| **Submenu** | Opens a nested list — because five questions read as a menu and twenty read as a wall. |
+| **Operator** | Calls a human and starts the countdown. |
+| **AI** | Reveals the input field and lets the model answer a free-form question. |
+
+The **AI item is hidden unless the assistant is switched on** for the site, and the assistant is off
+by default: the menu works without it, and the model is the last item rather than the only way in.
+
+### Waiting for a human
+
+Picking the operator item starts a countdown in the header — `Waiting for an operator · 4:12`. The
+deadline comes from the server, so closing the tab and coming back resumes the same wait instead of
+starting over. When it runs out the widget stops pretending and offers a phone number:
+
+> Sorry for the wait. Leave your number and we will call you back.
+
+The field is prefilled with `+373` (configurable on the server side) and the visitor is not forced to
+use it. A number that is left arrives in the operator's queue with the conversation.
+
 ## What the visitor gets
 
-- **Streaming answers.** Text appears as the model writes it, with a typing indicator in between.
+- **Streaming answers.** In the free-form item, text appears as the model writes it, with a typing indicator in between.
 - **A conversation that survives.** Messages live in the page's `localStorage` and are replayed from the server on reload — a refreshed tab does not lose the thread, and messages that arrived while the tab was closed are caught up.
-- **A human, on request.** "Talk to a human" flags the conversation; the assistant goes quiet so the visitor never reads two different voices answering in turn. The operator's reply arrives the same way the model's do.
+- **A human, on request.** The operator item flags the conversation; the assistant goes quiet so the visitor never reads two different voices answering in turn. The operator's reply arrives the same way the model's do.
 - **Honest failures.** A message that did not go through says so and can be retried; the same message is never stored twice, even if the visitor retries it.
 
 ## The other side
@@ -76,9 +106,12 @@ window.ECW_DEBUG = true;       // debug messages in the console
 
 Calling `init` twice is safe — a second widget will not appear. Integrators keep putting initialisation into components that remount, and a duplicated bubble is a bug report waiting to happen.
 
-## Appearance
+## Settings that arrive with the session
 
-Colour, window title and greeting are set **per site in the dashboard**, not in the tag: they arrive with the session, so changing them does not require editing the customer's page. Empty values mean the defaults.
+Colour, window title, greeting, the menu itself, whether the assistant answers free-form questions,
+and how long to wait for a human — all of it is set **per site on the server**, not in the tag. The
+widget asks for a session and receives all of it, so changing any of these does not require editing
+the customer's page or republishing the package.
 
 ## Self-hosting
 
