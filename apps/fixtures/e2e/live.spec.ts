@@ -47,10 +47,39 @@ test.describe('Связка виджета с настоящим серверо�
     await page.goto('/');
     await page.locator('.ecw-launcher').click();
 
+    // Ждём, пока виджет откроет сессию: до этого просьба уходит на сервер,
+    // который ещё не ответил ни на один запрос, и первые попытки падают не по
+    // вине посетителя. Виджет их повторяет, но проверке незачем измерять
+    // терпение — она проверяет передачу человеку.
+    await expect(page.locator('.ecw-menu__item').first()).toBeVisible();
+
     await page.locator('.ecw-link').click();
 
     // Подпись меняется только тогда, когда сервер действительно принял просьбу:
-    // двойник здесь ни при чём.
-    await expect(page.locator('.ecw-header__status')).toHaveText('An operator will reply');
+    // двойник здесь ни при чём. С недавних пор к ней добавился отсчёт ожидания —
+    // поэтому проверяем начало подписи, а не всю строку.
+    await expect(page.locator('.ecw-header__status')).toContainText('Waiting for an operator', {
+      timeout: 20_000,
+    });
+  });
+
+  test('чат открывается меню вопросов и отвечает без модели', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('.ecw-launcher').click();
+
+    // Первый экран — список вопросов, а не поле ввода: посетитель не должен
+    // придумывать вопрос, чтобы начать.
+    await expect(page.locator('.ecw-menu__item').first()).toBeVisible();
+    await expect(page.locator('.ecw-composer')).toBeHidden();
+
+    // Ответ лежит в базе, модель не участвует: проверка бесплатная и быстрая.
+    await page.locator('.ecw-menu__item', { hasText: 'What are your opening hours?' }).click();
+
+    await expect(page.locator('.ecw-message--ai .ecw-message__bubble').last()).toContainText(
+      'Monday to Friday',
+    );
+
+    // Меню возвращается на место: посетитель часто спрашивает второе.
+    await expect(page.locator('.ecw-menu__item').first()).toBeVisible();
   });
 });

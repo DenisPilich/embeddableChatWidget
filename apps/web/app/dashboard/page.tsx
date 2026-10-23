@@ -217,6 +217,13 @@ export default async function DashboardPage({
                         </span>
                       )}
                       {item.status === 'CLOSED' ? <span className="badge">closed</span> : null}
+                      {item.phone === null ? null : (
+                        <span className="badge badge--phone">
+                          {item.calledBackAt === null
+                            ? `call back ${item.phone}`
+                            : `called ${item.phone}`}
+                        </span>
+                      )}
                     </span>
 
                     <span className="queue__text">

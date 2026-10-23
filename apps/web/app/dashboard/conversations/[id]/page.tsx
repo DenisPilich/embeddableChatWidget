@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { findOperatorConversation, listMessages } from '@/lib/data';
 import { formatMoment, formatWaiting } from '@/lib/format';
 import { requireOperator } from '@/lib/operator';
-import { close, reopen, reply } from '../../actions';
+import { callBack, close, reopen, reply } from '../../actions';
 import { AutoRefresh } from '../../auto-refresh';
 import { ReplyForm } from '../../reply-form';
 import '../../dashboard.css';
@@ -62,6 +62,23 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
             Waiting for a human for {formatWaiting(waitingSince)}. The assistant stays quiet while
             this is set.
           </p>
+        )}
+
+        {conversation.phone === null ? null : (
+          <div className="conversation__phone">
+            <span className="badge badge--phone">
+              {conversation.calledBackAt === null
+                ? `Phone left: ${conversation.phone}`
+                : `Called back: ${conversation.phone}`}
+            </span>
+            {conversation.calledBackAt === null ? (
+              <form action={callBack.bind(null, conversation.id)}>
+                <button className="members__button" type="submit">
+                  Mark as called back
+                </button>
+              </form>
+            ) : null}
+          </div>
         )}
 
         {conversation.status === 'CLOSED' ? (

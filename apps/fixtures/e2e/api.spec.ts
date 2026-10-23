@@ -140,6 +140,28 @@ test.describe('API виджета', () => {
     expect(response.status()).toBe(200);
   });
 
+  test('телефон сохраняется и подтверждается сообщением', async ({ request }) => {
+    const { first } = requireSites();
+    const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');
+
+    const response = await request.post(`${apiBase}/api/v1/phone`, {
+      headers: {
+        Origin: session.origin,
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.token}`,
+      },
+      data: { phone: '+373 60 123 456' },
+    });
+
+    expect(response.status()).toBe(200);
+
+    // Номер приводится к «плюс и цифры»: оператор должен видеть номер, по
+    // которому можно набрать, а не то, как его набрали.
+    const body = (await response.json()) as { phone: string; message: { authorKind: string } };
+    expect(body.phone).toBe('+37360123456');
+    expect(body.message.authorKind).toBe('ai');
+  });
+
   test('ключ второго сайта с домена первого не работает', async ({ request }) => {
     const { first, second } = requireSites();
 

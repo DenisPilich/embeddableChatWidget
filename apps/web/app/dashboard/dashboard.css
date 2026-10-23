@@ -842,6 +842,107 @@
   overflow-wrap: anywhere;
 }
 
+/* ── Редактор меню ──────────────────────────────────────────────────────── */
+
+.menu-editor {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.menu-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.menu-row--new {
+  border-style: dashed;
+  background: #f8fafc;
+}
+
+.menu-row__form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-width: 0;
+}
+
+.menu-row__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.menu-row__field--wide {
+  grid-column: 1 / -1;
+}
+
+.menu-row__field--narrow {
+  max-width: 110px;
+}
+
+.menu-row__field input,
+.menu-row__field select,
+.menu-row__field textarea {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+
+.menu-row__field textarea {
+  resize: vertical;
+}
+
+.menu-row__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menu-row__meta {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.menu-row__delete {
+  align-self: start;
+}
+
+.menu-row__remove {
+  padding: 7px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #b91c1c;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.menu-row__remove:hover {
+  border-color: #fca5a5;
+}
+
+/*
+  Номер, оставленный вместо ожидания. Его должно быть видно в списке: иначе
+  «мы вам перезвоним» превращается в обещание в пустоту.
+*/
+.badge--phone {
+  background: #ecfdf5;
+  color: #047857;
+}
+
 /* ── Мобильная ширина ───────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {
@@ -864,4 +965,13 @@
   .thread__item {
     max-width: 100%;
   }
+}
+
+/* Оставленный телефон: виден в шапке переписки, рядом с кнопкой «перезвонил». */
+.conversation__phone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
 }

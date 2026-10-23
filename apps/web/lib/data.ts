@@ -446,6 +446,10 @@ export interface QueueItem {
   /** Кто написал последним. Видно, нужно ли вообще открывать разговор. */
   lastAuthor: Message['author'] | null;
   lastAt: Date | null;
+  /** Телефон, оставленный вместо ожидания оператора. */
+  phone: string | null;
+  /** Перезвонили ли уже. Пусто — ещё нет. */
+  calledBackAt: Date | null;
 }
 
 /** Что показывать в очереди. */
@@ -536,6 +540,8 @@ export async function listOperatorQueue(params: {
       humanRequestedAt: true,
       updatedAt: true,
       lastSeq: true,
+      phone: true,
+      calledBackAt: true,
       site: { select: { name: true } },
       messages: {
         orderBy: { seq: 'desc' },
@@ -558,6 +564,8 @@ export async function listOperatorQueue(params: {
       lastMessage: last?.body ?? null,
       lastAuthor: last?.author ?? null,
       lastAt: last?.createdAt ?? null,
+      phone: conversation.phone,
+      calledBackAt: conversation.calledBackAt,
     };
   });
 }
@@ -632,6 +640,37 @@ export async function reopenConversation(params: {
   await prisma.conversation.updateMany({
     where: { id: params.conversationId, siteId: params.siteId, status: 'CLOSED' },
     data: { status: 'OPEN', humanRequestedAt: null, answerFailures: 0 },
+  });
+}
+
+/**
+ * Настройки общения с посетителем: включён ли ассистент и сколько ждать
+ * оператора, прежде чем предложить телефон.
+ */
+export async function saveChatSettings(params: {
+  siteId: string;
+  aiEnabled: boolean;
+  handoverTimeoutSeconds: number;
+}): Promise<void> {
+  await prisma.site.update({
+    where: { id: params.siteId },
+    data: { aiEnabled: params.aiEnabled, handoverTimeoutSeconds: params.handoverTimeoutSeconds },
+  });
+}
+
+/**
+ * Отмечает, что по номеру перезвонили.
+ *
+ * Без этой отметки номера уходят в пустоту, а обещание «мы вам перезвоним»
+ * остаётся обещанием.
+ */
+export async function markCalledBack(params: {
+  siteId: string;
+  conversationId: string;
+}): Promise<void> {
+  await prisma.conversation.updateMany({
+    where: { id: params.conversationId, siteId: params.siteId, phone: { not: null } },
+    data: { calledBackAt: new Date() },
   });
 }
 

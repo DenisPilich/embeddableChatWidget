@@ -336,37 +336,55 @@ export class ChatWidget implements WidgetInstance {
     this.transport.onIdle(() => {
       this.handleIdle();
     });
-    void this.transport
-      .connect()
-      .then(() => {
-        // Настройки сайта известны только теперь: до открытия сессии виджет не
-        // знает ни меню, ни того, включён ли ассистент.
-        this.menu = [...this.transport.menu];
-        this.aiEnabled = this.transport.aiEnabled;
-        this.handoverSeconds = this.transport.handoverTimeout;
-        this.waitingSince = this.transport.waitingSince;
-        this.phoneGiven = this.transport.phone !== null;
+    void this.connectSession(0);
+  }
 
-        // Состояние ожидания известно только после открытия сессии: диалог мог
-        // ждать оператора ещё с прошлого визита.
-        this.setWaiting(this.transport.waitingForHuman);
+  /**
+   * Открывает сессию, повторяя попытку при неудаче.
+   *
+   * Один неудачный запрос не должен оставлять виджет мёртвым. Самая обидная
+   * причина — самая обычная: посетитель нажал на кнопку раньше, чем сервер
+   * ответил на первый запрос, и виджет до перезагрузки страницы молчал. Три
+   * повтора с растущей паузой покрывают это целиком.
+   */
+  private async connectSession(attempt: number): Promise<void> {
+    try {
+      await this.transport.connect();
 
-        const appearance = this.transport.appearance;
-        if (appearance !== null) {
-          this.applyAppearance(appearance);
-          saveAppearance(this.options.siteId, appearance);
-        }
-      })
-      .catch((error: unknown) => {
-        console.error('[ecw] не удалось открыть сессию', error);
-      })
-      .finally(() => {
-        // Приветствие добавляем только теперь: его текст может задать владелец
-        // сайта, а приходит он вместе с сессией. Показать одно приветствие и
-        // сразу заменить его на другое — хуже, чем подождать доли секунды.
-        this.showGreetingIfEmpty();
-        this.refreshFlow();
-      });
+      // Настройки сайта известны только теперь: до открытия сессии виджет не
+      // знает ни меню, ни того, включён ли ассистент.
+      this.menu = [...this.transport.menu];
+      this.aiEnabled = this.transport.aiEnabled;
+      this.handoverSeconds = this.transport.handoverTimeout;
+      this.waitingSince = this.transport.waitingSince;
+      this.phoneGiven = this.transport.phone !== null;
+
+      // Состояние ожидания известно только после открытия сессии: диалог мог
+      // ждать оператора ещё с прошлого визита.
+      this.setWaiting(this.transport.waitingForHuman);
+
+      const appearance = this.transport.appearance;
+      if (appearance !== null) {
+        this.applyAppearance(appearance);
+        saveAppearance(this.options.siteId, appearance);
+      }
+
+      // Приветствие добавляем только теперь: его текст может задать владелец
+      // сайта, а приходит он вместе с сессией. Показать одно приветствие и
+      // сразу заменить его на другое — хуже, чем подождать доли секунды.
+      this.showGreetingIfEmpty();
+      this.refreshFlow();
+    } catch (error) {
+      console.error('[ecw] не удалось открыть сессию', error);
+      if (attempt >= 3) return;
+
+      window.setTimeout(
+        () => {
+          void this.connectSession(attempt + 1);
+        },
+        1500 * (attempt + 1),
+      );
+    }
   }
 
   open(): void {
@@ -474,16 +492,32 @@ export class ChatWidget implements WidgetInstance {
 
     this.setWaiting(true);
 
-    try {
-      await this.transport.requestHuman();
-      this.appendMessage(
-        this.createMessage('ai', 'An operator has been asked to join this conversation.'),
-      );
-      this.registerIncoming();
-    } catch (error) {
-      this.setWaiting(false);
-      console.error('[ecw] не удалось позвать оператора', error);
+    // Нажать могли раньше, чем открылась сессия: тогда первый запрос упадёт не
+    // по вине посетителя. Повторяем — просьба не должна теряться из-за того,
+    // что сервер не успел ответить на первый запрос.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.transport.requestHuman();
+
+        // Отсчёт стартует и здесь: просьба пришла из шапки окна, а не из меню,
+        // но ждать оператора человек будет ровно так же долго.
+        this.waitingSince = Date.now();
+        this.appendMessage(
+          this.createMessage('ai', 'An operator has been asked to join this conversation.'),
+        );
+        this.registerIncoming();
+        return;
+      } catch (error) {
+        console.error('[ecw] не удалось позвать оператора', error);
+
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 1500 * (attempt + 1));
+        });
+      }
     }
+
+    // Обещать оператора, которого не позвали, нельзя.
+    this.setWaiting(false);
   }
 
   /** Показывает и скрывает состояние «ждём оператора». */

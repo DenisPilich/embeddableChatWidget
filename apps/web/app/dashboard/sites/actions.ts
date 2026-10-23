@@ -8,8 +8,15 @@ import {
   findOperatorSite,
   createSite,
   saveAiSettings,
+  saveChatSettings,
   saveSiteSettings,
 } from '@/lib/data';
+import {
+  createMenuOption,
+  deleteMenuOption,
+  updateMenuOption,
+  type MenuOptionInput,
+} from '@/lib/menu';
 import { canManage, requireOperator } from '@/lib/operator';
 
 /**
@@ -53,6 +60,13 @@ const settingsSchema = z.object({
     .trim()
     .max(500)
     .transform((value) => (value === '' ? null : value)),
+  // Флажок приходит только отмеченным: у неотмеченного в форме ничего нет,
+  // поэтому «поле отсутствует» и означает «выключено».
+  aiEnabled: z
+    .string()
+    .optional()
+    .transform((value) => value === 'on'),
+  handoverMinutes: z.coerce.number().int().min(1).max(30),
   systemPrompt: z.string().trim().min(20).max(8000),
   model: z.string().trim().min(1).max(120),
   temperature: z.coerce.number().min(0).max(2),
@@ -72,6 +86,8 @@ export async function saveSite(siteId: string, form: FormData): Promise<void> {
     widgetColor: field(form, 'widgetColor'),
     widgetTitle: field(form, 'widgetTitle'),
     widgetGreeting: field(form, 'widgetGreeting'),
+    aiEnabled: field(form, 'aiEnabled'),
+    handoverMinutes: field(form, 'handoverMinutes'),
     systemPrompt: field(form, 'systemPrompt'),
     model: field(form, 'model'),
     temperature: field(form, 'temperature'),
@@ -97,6 +113,12 @@ export async function saveSite(siteId: string, form: FormData): Promise<void> {
     widgetGreeting: data.widgetGreeting,
   });
 
+  await saveChatSettings({
+    siteId,
+    aiEnabled: data.aiEnabled,
+    handoverTimeoutSeconds: data.handoverMinutes * 60,
+  });
+
   await saveAiSettings({
     siteId,
     systemPrompt: data.systemPrompt,
@@ -107,6 +129,100 @@ export async function saveSite(siteId: string, form: FormData): Promise<void> {
 
   revalidatePath(path);
   redirect(`${path}?saved=1`);
+}
+
+const menuSchema = z.object({
+  label: z.string().trim().min(1).max(80),
+  action: z.enum(['ANSWER', 'OPERATOR', 'SUBMENU', 'AI']),
+  answer: z.string().trim().max(2000),
+  parentId: z.string().trim().max(120),
+  position: z.coerce.number().int().min(0).max(999),
+});
+
+/**
+ * Проверяет доступ к сайту и разбирает форму пункта меню.
+ *
+ * Возвращает `null`, если что-то не так: вызывающий уже ответил редиректом или
+ * 404. Так проверка не повторяется три раза в трёх действиях.
+ */
+function readMenuForm(form: FormData): { optionId: string | null; input: MenuOptionInput } | null {
+  const parsed = menuSchema.safeParse({
+    label: field(form, 'label'),
+    action: field(form, 'action'),
+    answer: field(form, 'answer'),
+    parentId: field(form, 'parentId'),
+    position: field(form, 'position'),
+  });
+
+  if (!parsed.success) return null;
+
+  // Ответ обязателен только у «показать ответ». У остальных действий он пуст:
+  // иначе в базе копится текст, который никогда не покажется.
+  const answer = parsed.data.action === 'ANSWER' ? parsed.data.answer : '';
+  if (parsed.data.action === 'ANSWER' && answer === '') return null;
+
+  const optionId = field(form, 'optionId');
+
+  return {
+    optionId: optionId === '' ? null : optionId,
+    input: {
+      label: parsed.data.label,
+      action: parsed.data.action,
+      answer: answer === '' ? null : answer,
+      parentId: parsed.data.parentId === '' ? null : parsed.data.parentId,
+      position: parsed.data.position,
+    },
+  };
+}
+
+/** Заводит пункт меню. */
+export async function addMenuItem(siteId: string, form: FormData): Promise<void> {
+  const operator = await requireOperator();
+
+  const site = await findOperatorSite({ workspaceIds: operator.workspaceIds, siteId });
+  if (site === null) notFound();
+
+  const parsed = readMenuForm(form);
+  if (parsed === null) redirect(`/dashboard/sites/${siteId}?menu=bad`);
+
+  await createMenuOption(siteId, parsed.input);
+
+  const path = `/dashboard/sites/${siteId}`;
+  revalidatePath(path);
+  redirect(`${path}?menu=added`);
+}
+
+/** Меняет пункт меню. */
+export async function saveMenuItem(siteId: string, form: FormData): Promise<void> {
+  const operator = await requireOperator();
+
+  const site = await findOperatorSite({ workspaceIds: operator.workspaceIds, siteId });
+  if (site === null) notFound();
+
+  const parsed = readMenuForm(form);
+  if (parsed === null || parsed.optionId === null) {
+    redirect(`/dashboard/sites/${siteId}?menu=bad`);
+  }
+
+  const saved = await updateMenuOption(siteId, parsed.optionId, parsed.input);
+
+  const path = `/dashboard/sites/${siteId}`;
+  revalidatePath(path);
+  redirect(saved ? `${path}?menu=saved` : `${path}?menu=bad`);
+}
+
+/** Удаляет пункт меню вместе с вложенными. */
+export async function deleteMenuItem(siteId: string, optionId: string): Promise<void> {
+  const operator = await requireOperator();
+
+  const site = await findOperatorSite({ workspaceIds: operator.workspaceIds, siteId });
+  if (site === null) notFound();
+
+  await deleteMenuOption(siteId, optionId);
+
+  const path = `/dashboard/sites/${siteId}`;
+  revalidatePath(path);
+  redirect(`${path}?menu=deleted`);
 }
 
 /** `form.get` возвращает ещё и файл: приведение через `String` дало бы `[object File]`. */

@@ -7,6 +7,7 @@ import {
   closeConversation,
   closeConversations,
   findOperatorConversation,
+  markCalledBack,
   reopenConversation,
 } from '@/lib/data';
 import { requireOperator } from '@/lib/operator';
@@ -65,6 +66,28 @@ export async function close(conversationId: string): Promise<void> {
 
   revalidatePath('/dashboard');
   redirect('/dashboard');
+}
+
+/**
+ * Отмечает, что по оставленному номеру перезвонили.
+ *
+ * Обещание «мы вам перезвоним» держится на человеке, а не на системе. Эта
+ * кнопка — единственное, что отличает данное обещание от забытого.
+ */
+export async function callBack(conversationId: string): Promise<void> {
+  const operator = await requireOperator();
+
+  const conversation = await findOperatorConversation({
+    workspaceIds: operator.workspaceIds,
+    conversationId,
+  });
+  if (conversation === null) notFound();
+
+  await markCalledBack({ siteId: conversation.siteId, conversationId });
+
+  const path = `/dashboard/conversations/${conversationId}`;
+  revalidatePath(path);
+  redirect(path);
 }
 
 /**

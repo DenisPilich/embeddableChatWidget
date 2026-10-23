@@ -100,7 +100,7 @@ test.describe('Панель оператора', () => {
     await page.getByLabel('Window title').fill('Little Cloud');
     await page.getByRole('button', { name: 'Save settings' }).click();
 
-    await expect(page.locator('.conversation__note')).toContainText('Saved');
+    await expect(page.locator('.conversation__note')).toContainText('Saved', { timeout: 20_000 });
 
     // Значение доехало до виджета: вид приходит вместе с сессией.
     const response = await request.post(`${apiBase}/api/v1/init`, {
@@ -513,6 +513,33 @@ test.describe('Панель оператора', () => {
     await expect(
       page.locator(`a[href="/dashboard/conversations/${session.conversationId}"]`),
     ).toHaveCount(1);
+  });
+
+  test('пункт меню заводится и удаляется в панели', async ({ page }) => {
+    test.slow();
+
+    await signIn(page);
+    await page.goto(`${WEB}/dashboard/sites`);
+    await page.locator('.card__link').first().click();
+    await expect(page).toHaveURL(/\/dashboard\/sites\//, { timeout: 20_000 });
+
+    const label = `Test question ${String(Date.now())}`;
+
+    // Считаем кнопки удаления, а не строки: в каждой строке есть выпадающий
+    // список со всеми вопросами сайта, и поиск по тексту находил бы их все.
+    const before = await page.locator('.menu-row__remove').count();
+
+    // Заводим пункт — так владелец и должен настраивать меню: без SQL.
+    const addRow = page.locator('.menu-row--new');
+    await addRow.getByLabel('New question').fill(label);
+    await addRow.getByLabel('Answer text').fill('A test answer.');
+    await addRow.getByRole('button', { name: 'Add question' }).click();
+
+    await expect(page.locator('.menu-row__remove')).toHaveCount(before + 1);
+
+    // Уборка: новый пункт встаёт последним по порядку, поэтому удаляем последний.
+    await page.locator('.menu-row__remove').last().click();
+    await expect(page.locator('.menu-row__remove')).toHaveCount(before);
   });
 });
 

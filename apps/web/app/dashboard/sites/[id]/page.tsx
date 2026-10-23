@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { activeModel } from '@/lib/ai';
 import { findOperatorSite } from '@/lib/data';
+import { listMenuOptions } from '@/lib/menu';
 import { requireOperator } from '@/lib/operator';
 import { saveSite } from '../actions';
+import { MenuEditor } from './menu-editor';
 import '../../dashboard.css';
 import './settings.css';
 
@@ -36,6 +38,7 @@ export default async function SiteSettingsPage({
   if (site === null) notFound();
 
   const ai = site.aiConfig;
+  const menu = await listMenuOptions(site.id);
 
   // Адрес API берём из самого запроса, а не из переменной окружения: тогда
   // строка вставки верна и на localhost, и на боевом домене, и не требует
@@ -191,12 +194,44 @@ export default async function SiteSettingsPage({
           </div>
         </fieldset>
 
+        <fieldset className="settings__group">
+          <legend>Visitor chat</legend>
+
+          <label className="settings__field settings__field--check">
+            <input name="aiEnabled" type="checkbox" defaultChecked={site.aiEnabled} />
+            <span>
+              Assistant answers free-form questions
+              <small>
+                Off by default: the visitor picks from the questions below, and “Ask my own
+                question” only appears when this is on.
+              </small>
+            </span>
+          </label>
+
+          <label className="settings__field">
+            <span>Wait for a human, minutes</span>
+            <input
+              name="handoverMinutes"
+              type="number"
+              min="1"
+              max="30"
+              required
+              defaultValue={Math.round(site.handoverTimeoutSeconds / 60)}
+            />
+            <small>
+              After this the chat offers to take a phone number instead of an indefinite wait.
+            </small>
+          </label>
+        </fieldset>
+
         <div className="reply__actions">
           <button className="reply__send" type="submit">
             Save settings
           </button>
         </div>
       </form>
+
+      <MenuEditor siteId={site.id} items={menu} />
 
       <section className="panel">
         <h2 className="panel__title">Embed on the site</h2>
