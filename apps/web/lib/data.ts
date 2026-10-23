@@ -527,12 +527,13 @@ export async function listOperatorQueue(params: {
 
   const conversations = await prisma.conversation.findMany({
     where: { ...scope, ...byFilter[params.filter ?? 'all'], ...bySearch },
-    orderBy: [
-      // Пустые значения в конце: Postgres по умолчанию ставит их в начало при
-      // сортировке по убыванию, и без этого ожидающие уехали бы в хвост.
-      { humanRequestedAt: { sort: 'asc', nulls: 'last' } },
-      { updatedAt: 'desc' },
-    ],
+    orderBy:
+      // В «всех» наверху то, где только что что-то произошло: владелец ищет
+      // свежий разговор, а не самый старый. В остальных вкладках порядок прежний —
+      // «дольше всех ждёт» значит именно это.
+      params.filter === 'all' || params.filter === undefined
+        ? [{ updatedAt: 'desc' }]
+        : [{ humanRequestedAt: { sort: 'asc', nulls: 'last' } }, { updatedAt: 'desc' }],
     take: params.limit,
     select: {
       id: true,
@@ -655,6 +656,34 @@ export async function saveChatSettings(params: {
   await prisma.site.update({
     where: { id: params.siteId },
     data: { aiEnabled: params.aiEnabled, handoverTimeoutSeconds: params.handoverTimeoutSeconds },
+  });
+}
+
+/**
+ * Снимает флаг ожидания оператора.
+ *
+ * Вызывается, когда оператор ответил: разговор больше не ждёт человека, и
+ * очередь не должна считать его ожидающим. Иначе счётчик растёт вечно, а
+ * «дольше всех ждёт» перестаёт что-либо значить.
+ */
+export async function clearHumanRequest(params: {
+  siteId: string;
+  conversationId: string;
+}): Promise<void> {
+  await prisma.conversation.updateMany({
+    where: { id: params.conversationId, siteId: params.siteId, humanRequestedAt: { not: null } },
+    data: { humanRequestedAt: null, answerFailures: 0 },
+  });
+}
+
+/** Настройки общения сайта: сколько ждать оператора и включён ли ассистент. */
+export async function readChatSettings(siteId: string): Promise<{
+  handoverTimeoutSeconds: number;
+  aiEnabled: boolean;
+} | null> {
+  return prisma.site.findUnique({
+    where: { id: siteId },
+    select: { handoverTimeoutSeconds: true, aiEnabled: true },
   });
 }
 

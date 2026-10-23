@@ -871,6 +871,11 @@ export class ChatWidget implements WidgetInstance {
       // Настоящий ответ вытесняет предварительный показ: дальше он не нужен.
       if (message.authorKind !== 'visitor') this.draft = '';
 
+      // Оператор ответил — ждать больше некого. Отсчёт снимаем сразу, а не
+      // тогда, когда посетитель перезагрузит страницу: иначе он видел бы, что
+      // его всё ещё ждут, хотя ответ уже пришёл.
+      if (message.authorKind === 'agent') this.setWaiting(false);
+
       this.appendMessage({
         id: message.id,
         authorKind: message.authorKind,

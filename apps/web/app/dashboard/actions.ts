@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import {
   appendAgentMessage,
+  clearHumanRequest,
   closeConversation,
   closeConversations,
   findOperatorConversation,
@@ -46,6 +47,11 @@ export async function reply(conversationId: string, form: FormData): Promise<voi
       operatorId: operator.id,
       body,
     });
+
+    // Оператор ответил — значит человек больше не ждёт. Без этого разговор
+    // оставался бы в очереди ожидающих с растущим счётчиком, а посетитель видел
+    // бы отсчёт, хотя ему уже ответили.
+    await clearHumanRequest({ siteId: conversation.siteId, conversationId });
   }
 
   const path = `/dashboard/conversations/${conversationId}`;

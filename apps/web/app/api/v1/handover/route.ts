@@ -1,6 +1,6 @@
 import type { NextResponse } from 'next/server';
 import { authenticateWidget } from '@/lib/auth';
-import { appendMessage, requestHuman } from '@/lib/data';
+import { appendMessage, readChatSettings, requestHuman } from '@/lib/data';
 import { errorResponse, jsonResponse, preflightResponse, requestOrigin } from '@/lib/http';
 
 /**
@@ -20,8 +20,22 @@ import { errorResponse, jsonResponse, preflightResponse, requestOrigin } from '@
 
 export const dynamic = 'force-dynamic';
 
-const CONFIRMATION =
-  'An operator has been asked to join this conversation. You can keep writing here.';
+/**
+ * Что видит посетитель после просьбы.
+ *
+ * Два обещания в одном сообщении: сколько ждать и что делать, если не дождался.
+ * Порог берётся из настроек сайта, а не вписан числом: владелец мог поставить
+ * минуту, и «ждите пять» было бы неправдой.
+ */
+function confirmation(timeoutSeconds: number): string {
+  const minutes = Math.max(1, Math.round(timeoutSeconds / 60));
+
+  return (
+    `An operator has been asked to join this conversation. ` +
+    `Please wait up to ${String(minutes)} ${minutes === 1 ? 'minute' : 'minutes'}. ` +
+    `If nobody joins by then, leave your phone number and we will call you back.`
+  );
+}
 
 export function OPTIONS(request: Request): Response {
   return preflightResponse(request);
@@ -40,6 +54,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
 
     if (first) {
+      const settings = await readChatSettings(claims.siteId);
+
       // Подтверждение — обычное сообщение диалога: посетитель видит, что
       // просьба принята, а оператор в дашборде видит её в переписке, а не
       // только в списке ожидающих.
@@ -47,7 +63,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         siteId: claims.siteId,
         conversationId: claims.conversationId,
         author: 'AI',
-        body: CONFIRMATION,
+        body: confirmation(settings?.handoverTimeoutSeconds ?? 300),
       });
     }
 
