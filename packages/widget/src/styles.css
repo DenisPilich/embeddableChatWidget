@@ -431,10 +431,13 @@
 }
 
 .ecw-menu__item {
-  padding: 11px 14px;
-  border: 1px solid #d9dbe1;
+  padding: 12px 14px;
+  border: 1px solid #e2e5ea;
   border-radius: 12px;
-  background: #fff;
+  /* Подложка в цвете сайта, но очень слабая: вопрос должен читаться как часть
+     окна, а не как чужая кнопка, вставленная в него. */
+  background: #fbfbfd;
+  background: color-mix(in srgb, var(--ecw-primary) 6%, #ffffff);
   color: #1f2937;
   font: inherit;
   font-size: 14px;
@@ -443,12 +446,14 @@
   cursor: pointer;
   transition:
     border-color 120ms ease,
-    background 120ms ease;
+    background 120ms ease,
+    transform 120ms ease;
 }
 
 .ecw-menu__item:hover {
   border-color: var(--ecw-primary);
-  background: #f8fafc;
+  background: color-mix(in srgb, var(--ecw-primary) 14%, #ffffff);
+  transform: translateY(-1px);
 }
 
 .ecw-menu__item:focus-visible {

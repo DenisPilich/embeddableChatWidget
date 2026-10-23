@@ -502,9 +502,8 @@ export class ChatWidget implements WidgetInstance {
         // Отсчёт стартует и здесь: просьба пришла из шапки окна, а не из меню,
         // но ждать оператора человек будет ровно так же долго.
         this.waitingSince = Date.now();
-        this.appendMessage(
-          this.createMessage('ai', 'An operator has been asked to join this conversation.'),
-        );
+        // Подтверждение приходит от сервера обычным сообщением — своё не
+        // добавляем, иначе посетитель читает две одинаковые фразы подряд.
         this.registerIncoming();
         return;
       } catch (error) {
