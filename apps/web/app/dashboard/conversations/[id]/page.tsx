@@ -138,7 +138,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
               <button className="reply__send" type="submit">
                 Send reply
               </button>
-              <span className="reply__hint">Ctrl+Enter sends</span>
+              <span className="reply__hint">Enter sends, Shift+Enter starts a new line</span>
             </div>
           </ReplyForm>
 

@@ -92,6 +92,14 @@ test.describe('Панель оператора', () => {
     // исчезает, и очередь перестаёт считать разговор ожидающим. Иначе счётчик
     // рос бы вечно, а посетитель видел бы отсчёт уже после ответа.
     await expect(page.locator('.conversation__note')).toHaveCount(0, { timeout: 20_000 });
+
+    // Тот же посетитель на демонстрационной странице: разговор с человеком
+    // должен продолжаться полем ввода, а не возвращаться к меню вопросов. Иначе
+    // ответить оператору можно, только заново позвав его.
+    await page.goto(`${WEB}/demo`);
+    await page.locator('.ecw-launcher').click();
+    await expect(page.locator('.ecw-composer')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('.ecw-menu__item')).toHaveCount(0);
   });
 
   test('владелец сохраняет настройки сайта, а чужой сайт ему недоступен', async ({

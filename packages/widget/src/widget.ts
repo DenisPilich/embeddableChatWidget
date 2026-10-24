@@ -243,6 +243,14 @@ export class ChatWidget implements WidgetInstance {
   private clock: number | null = null;
   /** Оставлял ли посетитель телефон. Второй раз не спрашиваем. */
   private phoneGiven = false;
+  /**
+   * Отвечал ли живой оператор.
+   *
+   * Выводится из переписки, а не хранится отдельно: посетитель мог закрыть
+   * вкладку и вернуться, и тогда разговор всё равно должен продолжаться с
+   * человеком, а не начинаться с меню.
+   */
+  private humanJoined = false;
 
   constructor(
     private readonly options: InitOptions,
@@ -523,13 +531,15 @@ export class ChatWidget implements WidgetInstance {
   private setWaiting(waiting: boolean): void {
     this.waiting = waiting;
     this.host.toggleAttribute('data-ecw-waiting', waiting);
-    this.humanButton.hidden = waiting;
+    // Кнопка «позвать человека» нужна, только пока человека нет: после ответа
+    // оператора звать некого.
+    this.humanButton.hidden = waiting || this.humanJoined;
 
     if (waiting) {
       this.startClock();
     } else {
       this.stopClock();
-      this.status.textContent = 'Assistant replies';
+      this.status.textContent = this.humanJoined ? 'A human is here' : 'Assistant replies';
     }
 
     this.refreshFlow();
@@ -554,6 +564,16 @@ export class ChatWidget implements WidgetInstance {
     }
 
     this.phoneBox.hidden = true;
+
+    // Живой оператор уже отвечал — значит посетитель разговаривает с человеком,
+    // и меню тут ни к чему: он должен иметь возможность просто ответить. Без
+    // этой ветки ответ оператора возвращал человека в список вопросов, и уйти
+    // оттуда можно было только заново позвав оператора.
+    if (this.humanJoined) {
+      this.menuBox.hidden = true;
+      this.showComposer(true);
+      return;
+    }
 
     if (this.menu.length > 0) {
       this.menuPath = null;
@@ -874,7 +894,10 @@ export class ChatWidget implements WidgetInstance {
       // Оператор ответил — ждать больше некого. Отсчёт снимаем сразу, а не
       // тогда, когда посетитель перезагрузит страницу: иначе он видел бы, что
       // его всё ещё ждут, хотя ответ уже пришёл.
-      if (message.authorKind === 'agent') this.setWaiting(false);
+      if (message.authorKind === 'agent') {
+        this.humanJoined = true;
+        this.setWaiting(false);
+      }
 
       this.appendMessage({
         id: message.id,
@@ -948,6 +971,11 @@ export class ChatWidget implements WidgetInstance {
       this.history.push(message);
       this.messages.append(message);
     }
+
+    // Если в переписке уже отвечал человек, разговор продолжается с ним. Выводим
+    // это из самой переписки: отдельного флага в хранилище не заводим — оно
+    // умеет теряться, а сообщения остаются.
+    this.humanJoined = restored.some((message) => message.authorKind === 'agent');
 
     this.messages.scrollToLatest();
     log(`переписка восстановлена: ${restored.length} сообщений`);
