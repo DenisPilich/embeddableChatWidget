@@ -612,7 +612,36 @@ export async function appendAgentMessage(params: {
     authorUserId: params.operatorId,
   });
 
+  // Первый ответ человека переводит разговор в «ведёт человек»: с этого момента
+  // ассистент молчит, даже если ожидание уже снято.
+  await prisma.conversation.updateMany({
+    where: { id: params.conversationId, siteId: params.siteId, humanJoinedAt: null },
+    data: { humanJoinedAt: new Date() },
+  });
+
   return stored.message;
+}
+
+/**
+ * Ведёт ли разговор человек.
+ *
+ * Истина и когда человека позвали (ожидание), и когда он уже ответил. Ассистенту
+ * нужно именно это: молчать в обоих случаях. Виджету нужно только первое —
+ * отсчёт ожидания, — поэтому у него остался отдельный isWaitingForHuman.
+ */
+export async function isHandledByHuman(params: {
+  siteId: string;
+  conversationId: string;
+}): Promise<boolean> {
+  const conversation = await prisma.conversation.findFirst({
+    where: { id: params.conversationId, siteId: params.siteId },
+    select: { humanRequestedAt: true, humanJoinedAt: true },
+  });
+
+  return (
+    conversation !== null &&
+    (conversation.humanRequestedAt !== null || conversation.humanJoinedAt !== null)
+  );
 }
 
 /** Закрывает диалог. Ожидание человека снимается: разговор окончен. */
@@ -622,7 +651,12 @@ export async function closeConversation(params: {
 }): Promise<void> {
   await prisma.conversation.updateMany({
     where: { id: params.conversationId, siteId: params.siteId, status: 'OPEN' },
-    data: { status: 'CLOSED', humanRequestedAt: null, answerFailures: 0 },
+    data: {
+      status: 'CLOSED',
+      humanRequestedAt: null,
+      humanJoinedAt: null,
+      answerFailures: 0,
+    },
   });
 }
 

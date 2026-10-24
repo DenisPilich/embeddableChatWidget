@@ -100,6 +100,20 @@ test.describe('Панель оператора', () => {
     await page.locator('.ecw-launcher').click();
     await expect(page.locator('.ecw-composer')).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('.ecw-menu__item')).toHaveCount(0);
+
+    // И ассистент при этом молчит: раз разговор ведёт человек, модель не должна
+    // вставлять свои ответы между репликами оператора.
+    const before = await listMessages(request, session);
+    await request.post(`${apiBase}/api/v1/messages`, {
+      headers: { ...authHeaders(session), 'Content-Type': 'application/json' },
+      data: { clientId: `silent-${String(Date.now())}`, body: 'Are you still there?' },
+    });
+    await page.waitForTimeout(3000);
+
+    const after = await listMessages(request, session);
+    expect(after.filter((message) => message.authorKind === 'ai').length).toBe(
+      before.filter((message) => message.authorKind === 'ai').length,
+    );
   });
 
   test('владелец сохраняет настройки сайта, а чужой сайт ему недоступен', async ({
