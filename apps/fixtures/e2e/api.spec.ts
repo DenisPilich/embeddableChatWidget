@@ -164,7 +164,19 @@ test.describe('API виджета', () => {
 
   test('без выбора «свой вопрос» ассистент молчит', async ({ request }) => {
     const { first } = requireSites();
-    const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');
+
+    // Сессию открываем сами, а не помощником: помощник включает ассистента, а
+    // проверка именно про то, что без выбора он молчит.
+    const init = await request.post(`${apiBase}/api/v1/init`, {
+      headers: { Origin: first.allowedOrigins[0] ?? '' },
+      data: { siteId: first.publicKey },
+    });
+    const { token } = (await init.json()) as { token: string };
+    const session = {
+      token,
+      conversationId: '',
+      origin: first.allowedOrigins[0] ?? '',
+    };
     const headers = {
       Origin: session.origin,
       'Content-Type': 'application/json',
@@ -184,7 +196,7 @@ test.describe('API виджета', () => {
 
     // Ассистент отвечает только после того, как посетитель выбрал «свой вопрос».
     // Свободный текст сам по себе — это сообщение оператору, а не модели.
-    const after = await listMessages(request, session, 0);
+    const after = (await listMessages(request, session, 0)).messages;
     expect(after.filter((message) => message.authorKind === 'ai').length).toBe(
       before.filter((message) => message.authorKind === 'ai').length,
     );
@@ -496,8 +508,45 @@ async function startSession(
     data: { siteId: publicKey },
   });
   expect(response.status()).toBe(200);
-  const body = (await response.json()) as InitResponseBody;
-  return { token: body.token, conversationId: body.conversationId, origin };
+  const body = (await response.json()) as InitResponseBody & { menu?: MenuNode[] };
+  const session = { token: body.token, conversationId: body.conversationId, origin };
+
+  // Ассистент отвечает только после того, как посетитель выбрал его в меню.
+  // Проверки API проверяют в том числе ответ модели, поэтому сессия для них
+  // начинается с этого выбора — как у настоящего посетителя.
+  const aiOption = findAiOption(body.menu ?? []);
+
+  if (aiOption !== undefined) {
+    const click = await request.post(`${apiBase}/api/v1/menu`, {
+      headers: {
+        Origin: origin,
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.token}`,
+      },
+      data: { optionId: aiOption },
+    });
+    expect(click.status()).toBe(200);
+  }
+
+  return session;
+}
+
+/** Пункт меню, увидев который ассистент получает право отвечать. */
+interface MenuNode {
+  id: string;
+  action: string;
+  children: MenuNode[];
+}
+
+function findAiOption(items: readonly MenuNode[]): string | undefined {
+  for (const item of items) {
+    if (item.action === 'ai') return item.id;
+
+    const nested = findAiOption(item.children);
+    if (nested !== undefined) return nested;
+  }
+
+  return undefined;
 }
 
 async function sendMessage(

@@ -3,7 +3,7 @@ import type { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { authenticateWidget } from '@/lib/auth';
 import { toChatMessage } from '@/lib/chat-message';
-import { appendMessage, readConversationState, requestHuman } from '@/lib/data';
+import { appendMessage, readConversationState, requestHuman, setAiMode } from '@/lib/data';
 import {
   errorResponse,
   jsonResponse,
@@ -76,6 +76,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     // requestHuman сам пишет в переписку «оператор приглашён», поэтому отдельную
     // реплику с текстом кнопки здесь не добавляем — вышло бы два раза про одно.
     await requestHuman({ siteId: claims.siteId, conversationId: claims.conversationId });
+  }
+
+  if (option.action === 'AI') {
+    // Только здесь и только по явному выбору посетителя ассистент получает
+    // право отвечать. Ни в каком другом случае модель не вмешивается.
+    await setAiMode({ siteId: claims.siteId, conversationId: claims.conversationId, on: true });
   }
 
   // Подменю и «свой вопрос» в переписку ничего не пишут: посетитель ещё ничего
