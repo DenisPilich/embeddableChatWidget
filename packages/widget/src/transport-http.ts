@@ -399,7 +399,11 @@ export class HttpTransport implements Transport {
     if (data === '') return;
 
     try {
-      const payload = JSON.parse(data) as { text?: string; message?: ChatMessage };
+      const payload = JSON.parse(data) as {
+        text?: string;
+        message?: ChatMessage;
+        waitingForHuman?: boolean;
+      };
 
       if (name === 'accepted') {
         this.confirmAccepted?.();
@@ -422,8 +426,9 @@ export class HttpTransport implements Transport {
       }
 
       if (name === 'idle') {
-        // Сервер прямо говорит, что ответа не будет: диалог ждёт оператора.
-        this.waiting = true;
+        // Ответа не будет. Ждём человека только если его действительно позвали:
+        // молчание модели — не повод показывать посетителю очередь к оператору.
+        this.waiting = payload.waitingForHuman === true;
         this.idleHandler?.();
       }
     } catch {

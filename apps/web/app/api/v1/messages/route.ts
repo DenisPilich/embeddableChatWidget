@@ -13,7 +13,6 @@ import {
   listMessages,
   listRecentMessages,
   readConversationState,
-  requestHuman,
 } from '@/lib/data';
 import { corsHeaders } from '@/lib/cors';
 import { messagesPerMinute, minuteAgo } from '@/lib/limits';
@@ -53,15 +52,6 @@ const PAGE_LIMIT = 100;
 
 /** Предельная длина сообщения. Ограничение защищает базу и бюджет ассистента. */
 const MAX_BODY_LENGTH = 4000;
-
-/**
- * Сколько неудач подряд считаем признаком, что модель не справляется.
- *
- * Три, а не одна: разовый сбой сервиса — обычное дело, и предлагать человека
- * после каждого — значит предлагать его всегда, в том числе когда ассистент
- * прекрасно отвечает.
- */
-const FAILURE_LIMIT = 3;
 
 const sendSchema = z.object({
   /** Идентификатор, присвоенный клиентом. На нём держится идемпотентность. */
@@ -241,13 +231,14 @@ async function replyTo(params: {
   });
 
   if (outcome.source === 'none') {
-    // Модель не ответила. Считаем неудачи подряд: три — это уже не случайность,
-    // и посетителю нужен человек, а не бесконечное «попробуйте позже».
-    const failures = await countAnswerFailure(params);
-    if (failures !== null && failures >= FAILURE_LIMIT) {
-      console.warn('[ecw] модель не отвечает подряд, зовём оператора', { failures });
-      await requestHuman(params);
-    }
+    // Модель не ответила. Неудачи считаем — они видны в журнале и объясняют,
+    // почему ассистент молчит, — но человека НЕ зовём.
+    //
+    // Раньше после трёх неудач подряд код сам звал оператора. Это оказалось
+    // неверным решением: посетитель выбрал ассистента, а получал очередь к
+    // человеку. Решать за него нельзя: он увидит честный текст, что ассистент
+    // сейчас недоступен, и сам выберет пункт «позвать человека», если нужно.
+    await countAnswerFailure(params);
   }
 
   // Пустой текст означает «отвечать нечем»: например, диалог уже ждёт живого
@@ -307,10 +298,17 @@ function streamReply(params: {
             signal: params.signal,
           });
 
-          // Ответа может не быть: диалог ждёт живого оператора. Тогда сообщаем
-          // виджету прямо — иначе он остался бы с индикатором набора навсегда.
+          // Ответа может не быть: диалог ждёт живого оператора, или модель
+          // сейчас недоступна. Виджету сообщаем прямо и с настоящим состоянием:
+          // «молчит модель» — не повод показывать посетителю очередь к человеку.
           if (answer) send('done', { message: toWireMessage(answer) });
-          else send('idle', { waitingForHuman: true });
+          else {
+            const state = await readConversationState({
+              siteId: params.siteId,
+              conversationId: params.conversationId,
+            });
+            send('idle', { waitingForHuman: state?.waitingForHuman ?? false });
+          }
         }
       } catch (error) {
         console.error('[ecw] не удалось ответить в потоке', error);
