@@ -1,4 +1,4 @@
-import type { ChatMessage, MenuItem, WidgetAppearance } from '@ecw/shared';
+import type { ChatMessage, ConversationState, MenuItem, WidgetAppearance } from '@ecw/shared';
 
 /**
  * Транспорт: как сообщения попадают на сервер и возвращаются обратно.
@@ -29,6 +29,9 @@ export type MessagesHandler = (messages: readonly ChatMessage[]) => void;
 
 /** Кусок ответа, пришедший раньше, чем ответ готов целиком. */
 export type DeltaHandler = (text: string) => void;
+
+/** Состояние разговора, пришедшее с сервером. */
+export type StateHandler = (state: ConversationState) => void;
 
 /** Что вернул выбор пункта меню. */
 export interface MenuChoice {
@@ -69,6 +72,15 @@ export interface Transport {
 
   /** Подписка на сообщения, появившиеся в диалоге. */
   onMessages(handler: MessagesHandler): void;
+
+  /**
+   * Подписка на изменение состояния разговора.
+   *
+   * Приходит с каждым опросом, но обработчик вызывается только когда состояние
+   * изменилось. По нему виджет узнаёт, что оператор закрыл разговор, и
+   * возвращается к меню.
+   */
+  onState(handler: StateHandler): void;
 
   /**
    * Подписка на текст ответа по мере появления.

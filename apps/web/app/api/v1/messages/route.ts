@@ -12,6 +12,7 @@ import {
   countRecentVisitorMessages,
   listMessages,
   listRecentMessages,
+  readConversationState,
   requestHuman,
 } from '@/lib/data';
 import { corsHeaders } from '@/lib/cors';
@@ -93,8 +94,42 @@ export async function GET(request: Request): Promise<NextResponse> {
   const response: MessagesResponse = {
     messages: messages.map(toWireMessage),
     lastSeq: messages.at(-1)?.seq ?? afterSeq,
+    state: toState(
+      await readConversationState({
+        siteId: claims.siteId,
+        conversationId: claims.conversationId,
+      }),
+    ),
   };
   return jsonResponse(response, 200, origin);
+}
+
+/**
+ * Состояние разговора для виджета.
+ *
+ * Если диалог не нашёлся (его удалили), отдаём «закрыт»: меню вернётся, и
+ * посетитель начнёт заново — это лучше, чем молча ждать ничего.
+ */
+function toState(
+  state: Awaited<ReturnType<typeof readConversationState>>,
+): MessagesResponse['state'] {
+  if (state === null) {
+    return {
+      waitingForHuman: false,
+      humanRequestedAt: null,
+      aiMode: false,
+      humanJoined: false,
+      closed: true,
+    };
+  }
+
+  return {
+    waitingForHuman: state.waitingForHuman,
+    humanRequestedAt: state.humanRequestedAt?.toISOString() ?? null,
+    aiMode: state.aiMode,
+    humanJoined: state.humanJoined,
+    closed: state.closed,
+  };
 }
 
 /** Отправка сообщения посетителя. */

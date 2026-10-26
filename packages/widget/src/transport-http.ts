@@ -1,5 +1,6 @@
 import type {
   ChatMessage,
+  ConversationState,
   InitResponse,
   MenuClickResponse,
   MenuItem,
@@ -14,6 +15,7 @@ import type {
   MessagesHandler,
   OutgoingMessage,
   PhoneLeft,
+  StateHandler,
   Transport,
 } from './transport';
 
@@ -80,6 +82,9 @@ function parseMoment(value: string | null): number | null {
 
 export class HttpTransport implements Transport {
   private handler: MessagesHandler | null = null;
+  private stateHandler: StateHandler | null = null;
+  /** Последнее известное состояние разговора: обработчик зовём только при изменении. */
+  private lastState = '';
   private deltaHandler: DeltaHandler | null = null;
   private idleHandler: (() => void) | null = null;
   /** Ждёт ли диалог оператора. Узнаём при открытии сессии. */
@@ -118,6 +123,10 @@ export class HttpTransport implements Transport {
 
   onMessages(handler: MessagesHandler): void {
     this.handler = handler;
+  }
+
+  onState(handler: StateHandler): void {
+    this.stateHandler = handler;
   }
 
   onDelta(handler: DeltaHandler): void {
@@ -470,6 +479,19 @@ export class HttpTransport implements Transport {
     }
   }
 
+  /** Сообщает виджету об изменении состояния разговора. */
+  private publishState(state: ConversationState | undefined): void {
+    // Старший сервер может не присылать состояние вовсе — виджет обязан это
+    // пережить, а не падать на разборе ответа.
+    if (state === undefined) return;
+
+    const key = JSON.stringify(state);
+    if (key === this.lastState) return;
+
+    this.lastState = key;
+    this.stateHandler?.(state);
+  }
+
   private scheduleNext(): void {
     if (this.stopped) return;
     if (this.timer !== null) window.clearTimeout(this.timer);
@@ -482,7 +504,6 @@ export class HttpTransport implements Transport {
   private async poll(): Promise<void> {
     this.timer = null;
     if (this.stopped) return;
-
     // Свёрнутая вкладка не должна занимать ни сеть, ни батарею: чужой сайт нам
     // этого не простит. Работа возобновится, когда посетитель вернётся.
     if (document.visibilityState === 'hidden') {
@@ -495,6 +516,10 @@ export class HttpTransport implements Transport {
         `/api/v1/messages?after=${String(this.cursor)}`,
         { method: 'GET', authorized: true },
       );
+
+      // Состояние приходит с каждым опросом и меняется редко: закрытие
+      // разговора, приход оператора, включение ассистента.
+      this.publishState(response.state);
 
       const fresh = response.messages.filter(
         (message) => message.clientId === undefined || !this.sent.has(message.clientId),

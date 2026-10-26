@@ -181,6 +181,25 @@ function tokenKeyFor(siteId: string): string {
 }
 
 /**
+ * Забывает переписку и пропуск посетителя.
+ *
+ * Нужно, когда разговор закрыли: следующий начинается с меню, и тянуть в него
+ * старую переписку с чужим токеном нельзя — виджет показал бы её, а сервер вёл
+ * бы уже другой разговор.
+ */
+export function clearSession(siteId: string): void {
+  const storage = getStorage();
+  if (!storage) return;
+
+  try {
+    storage.removeItem(keyFor(siteId));
+    storage.removeItem(tokenKeyFor(siteId));
+  } catch {
+    // Не смогли — не страшно: переписка перезапишется первым же сообщением.
+  }
+}
+
+/**
  * Запомненный вид окна.
  *
  * Нужен не ради экономии запроса, а ради первого кадра: вид приходит вместе с

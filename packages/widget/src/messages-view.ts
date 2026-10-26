@@ -30,6 +30,22 @@ export class MessagesView {
     this.timeFormatter = new Intl.DateTimeFormat(locale, TIME_FORMAT);
   }
 
+  /**
+   * Очищает переписку на экране.
+   *
+   * Нужно, когда разговор закрыли: новый начинается с меню, и старые сообщения
+   * в нём были бы чужими.
+   */
+  clear(): void {
+    this.setStreamingText(null);
+    this.setTyping(false);
+
+    for (const node of this.nodes.values()) node.remove();
+    this.nodes.clear();
+    this.streamingRow = null;
+    this.streamingBubble = null;
+  }
+
   append(message: WidgetMessage): void {
     // Окончательное сообщение вытесняет предварительный показ: иначе один и тот
     // же ответ остался бы в переписке дважды.

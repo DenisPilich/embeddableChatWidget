@@ -162,6 +162,34 @@ test.describe('API виджета', () => {
     expect(body.message.authorKind).toBe('ai');
   });
 
+  test('без выбора «свой вопрос» ассистент молчит', async ({ request }) => {
+    const { first } = requireSites();
+    const session = await startSession(request, first.publicKey, first.allowedOrigins[0] ?? '');
+    const headers = {
+      Origin: session.origin,
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.token}`,
+    };
+
+    const before = (await listMessages(request, session, 0)).messages;
+
+    await request.post(`${apiBase}/api/v1/messages`, {
+      headers,
+      data: { clientId: `silent-${String(Date.now())}`, body: 'Do you have oat milk?' },
+    });
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 1500);
+    });
+
+    // Ассистент отвечает только после того, как посетитель выбрал «свой вопрос».
+    // Свободный текст сам по себе — это сообщение оператору, а не модели.
+    const after = await listMessages(request, session, 0);
+    expect(after.filter((message) => message.authorKind === 'ai').length).toBe(
+      before.filter((message) => message.authorKind === 'ai').length,
+    );
+  });
+
   test('ключ второго сайта с домена первого не работает', async ({ request }) => {
     const { first, second } = requireSites();
 

@@ -290,7 +290,8 @@ export async function requestHuman(params: {
     // Условие по сайту обязательно: без него чужой диалог можно было бы позвать
     // в операторы.
     where: { id: params.conversationId, siteId: params.siteId, humanRequestedAt: null },
-    data: { humanRequestedAt: new Date(), answerFailures: 0 },
+    // Ассистент замолкает: разговор ведёт человек.
+    data: { humanRequestedAt: new Date(), aiMode: false, answerFailures: 0 },
   });
 
   return updated.count > 0;
@@ -321,10 +322,22 @@ export async function readConversationState(params: {
   waitingForHuman: boolean;
   humanRequestedAt: Date | null;
   phone: string | null;
+  /** Отвечает ли ассистент в этом разговоре. */
+  aiMode: boolean;
+  /** Отвечал ли уже живой оператор. */
+  humanJoined: boolean;
+  /** Закрыт ли разговор: после закрытия посетитель снова видит меню. */
+  closed: boolean;
 } | null> {
   const conversation = await prisma.conversation.findFirst({
     where: { id: params.conversationId, siteId: params.siteId },
-    select: { humanRequestedAt: true, phone: true },
+    select: {
+      humanRequestedAt: true,
+      phone: true,
+      aiMode: true,
+      humanJoinedAt: true,
+      status: true,
+    },
   });
 
   if (conversation === null) return null;
@@ -333,6 +346,50 @@ export async function readConversationState(params: {
     waitingForHuman: conversation.humanRequestedAt !== null,
     humanRequestedAt: conversation.humanRequestedAt,
     phone: conversation.phone,
+    aiMode: conversation.aiMode,
+    humanJoined: conversation.humanJoinedAt !== null,
+    closed: conversation.status === 'CLOSED',
+  };
+}
+
+/**
+ * Включает или выключает ассистента в разговоре.
+ *
+ * Вызывается, когда посетитель выбрал пункт «свой вопрос»: только после этого
+ * модель имеет право отвечать. Всё остальное время разговор ведут меню или
+ * человек.
+ */
+export async function setAiMode(params: {
+  siteId: string;
+  conversationId: string;
+  on: boolean;
+}): Promise<void> {
+  await prisma.conversation.updateMany({
+    where: { id: params.conversationId, siteId: params.siteId, status: 'OPEN' },
+    data: { aiMode: params.on },
+  });
+}
+
+/**
+ * Что нужно ассистенту, чтобы решить, отвечать ли.
+ *
+ * Один запрос вместо двух: включён ли режим ассистента и не ведёт ли разговор
+ * человек. Модель отвечает только когда первое истинно, а второе — ложно.
+ */
+export async function readReplyState(params: {
+  siteId: string;
+  conversationId: string;
+}): Promise<{ aiMode: boolean; handled: boolean } | null> {
+  const conversation = await prisma.conversation.findFirst({
+    where: { id: params.conversationId, siteId: params.siteId },
+    select: { aiMode: true, humanRequestedAt: true, humanJoinedAt: true },
+  });
+
+  if (conversation === null) return null;
+
+  return {
+    aiMode: conversation.aiMode,
+    handled: conversation.humanRequestedAt !== null || conversation.humanJoinedAt !== null,
   };
 }
 
@@ -644,7 +701,7 @@ export async function isHandledByHuman(params: {
   );
 }
 
-/** Закрывает диалог. Ожидание человека снимается: разговор окончен. */
+/** Закрывает диалог. Ожидание человека и режим ассистента снимаются. */
 export async function closeConversation(params: {
   siteId: string;
   conversationId: string;
@@ -655,6 +712,7 @@ export async function closeConversation(params: {
       status: 'CLOSED',
       humanRequestedAt: null,
       humanJoinedAt: null,
+      aiMode: false,
       answerFailures: 0,
     },
   });

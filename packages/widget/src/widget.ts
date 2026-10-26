@@ -1,8 +1,14 @@
-import type { AuthorKind, ChatMessage, MenuItem, WidgetAppearance } from '@ecw/shared';
+import type {
+  AuthorKind,
+  ChatMessage,
+  ConversationState,
+  MenuItem,
+  WidgetAppearance,
+} from '@ecw/shared';
 import { mustFind, pickMountNode } from './dom';
 import { log } from './logger';
 import { MessagesView } from './messages-view';
-import { loadAppearance, loadHistory, saveAppearance, saveHistory } from './storage';
+import { clearSession, loadAppearance, loadHistory, saveAppearance, saveHistory } from './storage';
 import { applyStyles } from './styles';
 import type { Transport } from './transport';
 import type { InitOptions, MessageStatus, WidgetInstance, WidgetMessage } from './types';
@@ -251,6 +257,10 @@ export class ChatWidget implements WidgetInstance {
    * человеком, а не начинаться с меню.
    */
   private humanJoined = false;
+  /** Отвечает ли ассистент: включается только пунктом «свой вопрос». */
+  private aiOn = false;
+  /** Разговор уже сброшен после закрытия: повторно не сбрасываем. */
+  private resetDone = false;
 
   constructor(
     private readonly options: InitOptions,
@@ -344,6 +354,9 @@ export class ChatWidget implements WidgetInstance {
     this.transport.onIdle(() => {
       this.handleIdle();
     });
+    // Состояние разговора приходит с опросом: по нему виджет узнаёт про
+    // закрытие и про то, что оператор взял разговор.
+    this.transport.onState((state) => this.applyState(state));
     void this.connectSession(0);
   }
 
@@ -358,6 +371,8 @@ export class ChatWidget implements WidgetInstance {
   private async connectSession(attempt: number): Promise<void> {
     try {
       await this.transport.connect();
+      // Сессия открылась заново — сброс после закрытия больше не действует.
+      this.resetDone = false;
 
       // Настройки сайта известны только теперь: до открытия сессии виджет не
       // знает ни меню, ни того, включён ли ассистент.
@@ -565,11 +580,9 @@ export class ChatWidget implements WidgetInstance {
 
     this.phoneBox.hidden = true;
 
-    // Живой оператор уже отвечал — значит посетитель разговаривает с человеком,
-    // и меню тут ни к чему: он должен иметь возможность просто ответить. Без
-    // этой ветки ответ оператора возвращал человека в список вопросов, и уйти
-    // оттуда можно было только заново позвав оператора.
-    if (this.humanJoined) {
+    // Живой оператор уже отвечал или посетитель сам выбрал ассистента — значит
+    // разговор идёт с человеком или с моделью, и меню тут ни к чему.
+    if (this.humanJoined || this.aiOn) {
       this.menuBox.hidden = true;
       this.showComposer(true);
       return;
@@ -586,6 +599,59 @@ export class ChatWidget implements WidgetInstance {
     // Меню нет — виджет ведёт себя как обычный чат.
     this.menuBox.hidden = true;
     this.showComposer(true);
+  }
+
+  /**
+   * Применяет состояние разговора, пришедшее с сервером.
+   *
+   * Два важных перехода. Закрытый разговор возвращает посетителя к меню: он не
+   * должен остаться в переписке, которая уже окончена. И ожидание оператора
+   * подчиняется серверу, а не памяти вкладки: перезагрузка страницы его не
+   * сбрасывает.
+   */
+  private applyState(state: ConversationState): void {
+    if (state.closed) {
+      this.resetSession();
+      return;
+    }
+
+    this.aiOn = state.aiMode;
+    this.humanJoined = state.humanJoined;
+    this.waitingSince = state.humanRequestedAt === null ? null : Date.parse(state.humanRequestedAt);
+
+    this.setWaiting(state.waitingForHuman);
+  }
+
+  /**
+   * Начинает разговор заново после закрытия.
+   *
+   * Переписку и пропуск стираем: закрытый разговор сервер продолжать не будет, и
+   * со старым токеном виджет писал бы в него же. Новый начинается с меню — как
+   * в первый раз.
+   */
+  private resetSession(): void {
+    if (this.resetDone) return;
+    this.resetDone = true;
+
+    clearSession(this.options.siteId);
+    this.history.length = 0;
+    this.messages.clear();
+
+    this.humanJoined = false;
+    this.aiOn = false;
+    this.phoneGiven = false;
+    this.waitingSince = null;
+    this.menuPath = null;
+
+    this.stopClock();
+    this.waiting = false;
+    this.host.removeAttribute('data-ecw-waiting');
+    this.humanButton.hidden = false;
+    this.status.textContent = 'Assistant replies';
+    this.phoneBox.hidden = true;
+
+    this.refreshFlow();
+    void this.connectSession(0);
   }
 
   /** Прошло ли время ожидания, после которого предлагаем телефон. */

@@ -3,7 +3,7 @@ import { activeModel, resolveProvider, type ChatTurn } from './ai';
 import { EXTRACTION_REFUSAL, looksLikePromptExtraction } from './guard';
 import {
   findAiSettings,
-  isHandledByHuman,
+  readReplyState,
   recordTokenUsage,
   resetAnswerFailures,
   tokensUsedToday,
@@ -69,13 +69,12 @@ export async function answerQuestion(params: {
   /** Отмена: посетитель закрыл окно, и платить за остаток ответа незачем. */
   signal?: AbortSignal;
 }): Promise<AnswerOutcome> {
-  // Разговор ведёт человек — ассистент замолкает. Иначе оператор и модель
-  // отвечали бы по очереди, и посетитель читал бы двух разных собеседников.
-  // Сюда же относится случай «оператор уже ответил»: ожидание снято, но
-  // вмешиваться модели всё равно нельзя.
-  // Пустой текст означает «отвечать нечем»: обработчик в этом случае ничего не
-  // записывает, а виджету про ожидание сообщает отдельно.
-  if (await isHandledByHuman(params)) {
+  // Ассистент отвечает ТОЛЬКО тогда, когда посетитель выбрал пункт «свой
+  // вопрос»: это единственный вход модели. Всё остальное время разговор ведут
+  // меню или живой оператор, и вставлять ответы модели нельзя.
+  const state = await readReplyState(params);
+
+  if (state === null || !state.aiMode || state.handled) {
     return { text: '', source: 'human', tokens: 0 };
   }
 
