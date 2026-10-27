@@ -706,6 +706,18 @@ export class ChatWidget implements WidgetInstance {
 
     if (item.action === 'ai') {
       // Свободный вопрос: показываем поле ввода, меню убираем.
+      //
+      // И обязательно сообщаем серверу, что посетитель выбрал ассистента: без
+      // этого запроса модель не получает права отвечать, и человек видит, как
+      // индикатор набора гаснет без ответа. Раньше здесь был только показ поля
+      // ввода — отсюда и «ассистент не может писать вообще».
+      try {
+        await this.transport.chooseMenuItem(item.id);
+      } catch (error) {
+        console.error('[ecw] не удалось включить ассистента', error);
+      }
+
+      this.aiOn = true;
       this.menuPath = null;
       this.menuBox.hidden = true;
       this.showComposer(true);

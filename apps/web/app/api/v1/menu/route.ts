@@ -3,7 +3,13 @@ import type { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { authenticateWidget } from '@/lib/auth';
 import { toChatMessage } from '@/lib/chat-message';
-import { appendMessage, readConversationState, requestHuman, setAiMode } from '@/lib/data';
+import {
+  appendMessage,
+  clearHumanRequest,
+  readConversationState,
+  requestHuman,
+  setAiMode,
+} from '@/lib/data';
 import {
   errorResponse,
   jsonResponse,
@@ -82,6 +88,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Только здесь и только по явному выбору посетителя ассистент получает
     // право отвечать. Ни в каком другом случае модель не вмешивается.
     await setAiMode({ siteId: claims.siteId, conversationId: claims.conversationId, on: true });
+
+    // И снимаем ожидание человека: посетитель мог позвать оператора, не
+    // дождаться и вернуться к ассистенту. Без этого разговор оставался бы
+    // «ведёт человек», и модель молчала бы, хотя её только что выбрали.
+    await clearHumanRequest({ siteId: claims.siteId, conversationId: claims.conversationId });
   }
 
   // Подменю и «свой вопрос» в переписку ничего не пишут: посетитель ещё ничего
